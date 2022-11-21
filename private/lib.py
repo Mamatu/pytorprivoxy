@@ -16,7 +16,8 @@ class _Process:
     def __init__(self, cmd):
         import threading
         self.lock = threading.Lock()
-        self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines=True)
+        #self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines=True)
+        self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     def call_safe(self, callback):
         try:
             self.lock.acquire()
@@ -30,16 +31,17 @@ class _Process:
             return
         self.process.stdout.close()
         self.process.stderr.close()
-        parent = psutil.Process(self.process.pid)
-        children = parent.children(recursive=True)
-        for child in children:
-            child.terminate()
-        self.process.terminate()
-        if wait_for_end:
-            self.process.wait()
-        self.process = None
-    def __del__(self):
-        self.kill()
+        try:
+            parent = psutil.Process(self.process.pid)
+            children = parent.children(recursive=True)
+            for child in children:
+                child.terminate()
+            self.process.terminate()
+            if wait_for_end:
+                self.process.wait()
+            self.process = None
+        except psutil.NoSuchProcess as nsp:
+            pass
     def wait(self):
         if self.process:
             self.process.wait()
@@ -68,13 +70,12 @@ class _TorProcess(_Process):
         is_initialized_str = "Bootstrapped 100% (done): Done"
         try:
             line = self.process.stdout.readline()
-            print(line)
+            logging.debug(line)
             if is_initialized_str in line:
-                logging.info("Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
+                logging.info(f"Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
                 return True
             return False
         except Exception as ex:
-            print(ex)
             return False
     def wait_for_initialization(self, timeout = 60, timestep = 0.5):
         duration = 0
@@ -89,14 +90,11 @@ class _TorProcess(_Process):
                 return False
     def kill(self):
         self.stop_initialization = True
-        super().kill(wait_for_end = False)
+        super().kill(wait_for_end = True)
         if hasattr(self, "config"):
             self.config.close()
         if hasattr(self, "data_directory"):
             self.data_directory.cleanup()
-    def __del__(self):
-        self.kill()
-        super().__del__()
 
 class _PrivoxyProcess(_Process):
     def __make_config(self, socks_port, listen_port):
@@ -115,9 +113,6 @@ class _PrivoxyProcess(_Process):
         super().kill()
         if hasattr(self, "config"):
             self.config.close()
-    def __del__(self):
-        self.kill()
-        super().__del__()
 
 class _Instance:
     def __init__(self, tor_process, privoxy_process):
@@ -132,7 +127,6 @@ class _Instance:
         try:
             return self.tor_process.wait_for_initialization(timeout, timestep)
         except _TorProcess.StopInitialization:
-            print("false")
             return False
     def wait_for_processes_kill(self):
         self.tor_process.wait()
