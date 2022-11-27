@@ -14,40 +14,46 @@ def set_control_hash_password(control_hash_password):
 
 class _Process:
     def __init__(self, cmd):
+        self.is_destroyed_flag = False
         import threading
         self.lock = threading.Lock()
-        #self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines=True)
-        self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    def call_safe(self, callback):
-        try:
-            self.lock.acquire()
-            return callback()
-        finally:
-            self.lock.release()
-    def kill(self, wait_for_end = True):
+        self.cmd = cmd
+        self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
+    def was_destroyed(self):
+        return self.is_destroyed_flag
+    def emit_error_during_destroy(self, ex):
+        logging.error(f"{ex}: please verify if process {self.cmd} was properly closed")
+    def destroy(self, wait_for_end = True):
+        self.is_destroyed_flag = True
         if not hasattr(self, "process"):
             return
         if self.process is None:
             return
         self.process.stdout.close()
         self.process.stderr.close()
+        print("closed")
         try:
             parent = psutil.Process(self.process.pid)
             children = parent.children(recursive=True)
             for child in children:
                 child.terminate()
             self.process.terminate()
-            if wait_for_end:
-                self.process.wait()
+            try:
+                self.process.wait(timeout = 5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout = 5)
             self.process = None
         except psutil.NoSuchProcess as nsp:
-            pass
+            self.emit_error_during_destroy(nsp)
+        except subprocess.TimeoutExpired as te:
+            self.emit_error_during_destroy(te)
     def wait(self):
         if self.process:
             self.process.wait()
 
 class _TorProcess(_Process):
-    class StopInitialization(Exception):
+    class Stopped(Exception):
         pass
     def __make_config(self, socks_port, control_port, listen_port, data_directory_path):
         global _control_hash_password
@@ -59,42 +65,61 @@ class _TorProcess(_Process):
         config.flush()
         return config
     def __init__(self, socks_port, control_port, listen_port):
+        self.wait_for_initialization = self._instance_wait_for_initialization
+        self.was_initialized = False
         self.data_directory = tempfile.TemporaryDirectory()
         self.config = self.__make_config(socks_port, control_port, listen_port, self.data_directory.name)
         super().__init__(["tor", "-f", self.config.name])
         self.socks_port = socks_port
         self.control_port = control_port
         self.listen_port = listen_port
-        self.stop_initialization = False
+        self.detroy_flag = False
+        logging.info(f"Instace of tor process: {self.id_ports()}")
     def is_initialized(self):
+        if self.was_initialized:
+            return True
         is_initialized_str = "Bootstrapped 100% (done): Done"
         try:
             line = self.process.stdout.readline()
-            logging.debug(line)
+            line = line.replace("\n", "")
+            logging.debug(f"{self.id_ports()} {line}")
             if is_initialized_str in line:
-                logging.info(f"Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
+                logging.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
+                self.was_initialized = True
                 return True
             return False
         except Exception as ex:
+            logging.error(f"{self.id_ports()} {ex}")
             return False
-    def wait_for_initialization(self, timeout = 60, timestep = 0.5):
+    @staticmethod
+    def wait_for_initialization(callback_is_initialized, callback_to_stop, timeout = 60, delay = 0.5):
         duration = 0
         while True:
-            if self.stop_initialization:
-                raise _TorProcess.StopInitialization()
-            if self.is_initialized():
+            if callback_to_stop():
+                raise _TorProcess.Stopped()
+            if callback_is_initialized():
                 return True
-            time.sleep(timestep)
-            duration = duration + timestep
+            time.sleep(delay)
+            duration = duration + delay
             if duration >= timeout:
                 return False
-    def kill(self):
-        self.stop_initialization = True
-        super().kill(wait_for_end = True)
+    def _instance_wait_for_initialization(self, timeout = 60, delay = 0.5):
+        """
+        It is accessible by self.wait_for_initialization
+        """
+        return _TorProcess.wait_for_initialization(lambda: self.is_initialized(), lambda: self.was_destroyed(), timeout, delay)
+    def was_destroyed(self):
+        return self.detroy_flag
+    def destroy(self):
+        print(f"{self}")
+        self.detroy_flag = True
+        super().destroy(wait_for_end = True)
         if hasattr(self, "config"):
             self.config.close()
         if hasattr(self, "data_directory"):
             self.data_directory.cleanup()
+    def id_ports(self):
+        return f"({self.socks_port} {self.control_port} {self.listen_port})"
 
 class _PrivoxyProcess(_Process):
     def __make_config(self, socks_port, listen_port):
@@ -109,8 +134,9 @@ class _PrivoxyProcess(_Process):
     def __init__(self, socks_port, listen_port):
         self.config = self.__make_config(socks_port, listen_port)
         super().__init__(["privoxy", "--no-daemon", self.config.name])
-    def kill(self):
-        super().kill()
+    def destroy(self):
+        print(f"{self}")
+        super().destroy()
         if hasattr(self, "config"):
             self.config.close()
 
@@ -120,24 +146,24 @@ class _Instance:
         self.privoxy_process = privoxy_process
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
-    def kill(self):
-        self.privoxy_process.kill()
-        self.tor_process.kill()
-    def wait_for_initialization(self, timeout = 60, timestep = 0.5):
+    def destroy(self):
+        self.privoxy_process.destroy()
+        self.tor_process.destroy()
+    def wait_for_initialization(self, timeout = 60, delay = 0.5):
         try:
-            return self.tor_process.wait_for_initialization(timeout, timestep)
-        except _TorProcess.StopInitialization:
+            return self.tor_process.wait_for_initialization(timeout, delay)
+        except _TorProcess.Stopped:
             return False
-    def wait_for_processes_kill(self):
-        self.tor_process.wait()
+    def join(self):
         self.privoxy_process.wait()
+        self.tor_process.wait()
 
 def _is_port_used(port : int) -> bool:
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM):
         return s.connect_ex(('localhost', port)) == 0
 
-def _run_tor_privoxy_none_block(socks_port, control_port, listen_port):
+def _make_tor_privoxy_none_block(socks_port, control_port, listen_port):
     privoxy_process = _PrivoxyProcess(socks_port = socks_port, listen_port = listen_port)
     tor_process = _TorProcess(socks_port = socks_port, control_port = control_port, listen_port = listen_port)
     instance = _Instance(tor_process = tor_process, privoxy_process = privoxy_process)
