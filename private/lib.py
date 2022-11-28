@@ -31,7 +31,6 @@ class _Process:
             return
         self.process.stdout.close()
         self.process.stderr.close()
-        print("closed")
         try:
             parent = psutil.Process(self.process.pid)
             children = parent.children(recursive=True)
@@ -92,7 +91,7 @@ class _TorProcess(_Process):
             logging.error(f"{self.id_ports()} {ex}")
             return False
     @staticmethod
-    def wait_for_initialization(callback_is_initialized, callback_to_stop, timeout = 60, delay = 0.5):
+    def wait_for_initialization(callback_is_initialized, callback_to_stop, timeout = 300, delay = 0.5):
         duration = 0
         while True:
             if callback_to_stop():
@@ -103,7 +102,7 @@ class _TorProcess(_Process):
             duration = duration + delay
             if duration >= timeout:
                 return False
-    def _instance_wait_for_initialization(self, timeout = 60, delay = 0.5):
+    def _instance_wait_for_initialization(self, timeout = 300, delay = 0.5):
         """
         It is accessible by self.wait_for_initialization
         """
@@ -111,7 +110,6 @@ class _TorProcess(_Process):
     def was_destroyed(self):
         return self.detroy_flag
     def destroy(self):
-        print(f"{self}")
         self.detroy_flag = True
         super().destroy(wait_for_end = True)
         if hasattr(self, "config"):
@@ -135,7 +133,6 @@ class _PrivoxyProcess(_Process):
         self.config = self.__make_config(socks_port, listen_port)
         super().__init__(["privoxy", "--no-daemon", self.config.name])
     def destroy(self):
-        print(f"{self}")
         super().destroy()
         if hasattr(self, "config"):
             self.config.close()
