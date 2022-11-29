@@ -62,4 +62,4 @@ if __name__ == "__main__":
                 instance = start(*args.start, **args_dict)
                 instance.join()
     except TimeoutError as te:
-        logging.error("Timeout expired")
+        logging.error(f"Timeout expired: {te}")
