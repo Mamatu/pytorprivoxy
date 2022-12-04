@@ -21,8 +21,8 @@ class _Process:
         self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
     def was_destroyed(self):
         return self.is_destroyed_flag
-    def emit_error_during_destroy(self, ex):
-        logging.error(f"{ex}: please verify if process {self.cmd} was properly closed")
+    def emit_warning_during_destroy(self, ex):
+        logging.warning(f"{ex}: please verify if process {self.cmd} was properly closed")
     def destroy(self, wait_for_end = True):
         self.is_destroyed_flag = True
         if not hasattr(self, "process"):
@@ -44,9 +44,9 @@ class _Process:
                 self.process.wait(timeout = 5)
             self.process = None
         except psutil.NoSuchProcess as nsp:
-            self.emit_error_during_destroy(nsp)
+            self.emit_warning_during_destroy(nsp)
         except subprocess.TimeoutExpired as te:
-            self.emit_error_during_destroy(te)
+            self.emit_warning_during_destroy(te)
     def wait(self):
         if self.process:
             self.process.wait()

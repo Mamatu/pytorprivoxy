@@ -28,6 +28,7 @@ atexit.register(stop_all)
 
 import signal
 def signal_handler(sig, frame):
+    logging.info("Registering sig for application. It will stop all")
     stop_all()
 
 signal.signal(signal.SIGINT, signal_handler)
