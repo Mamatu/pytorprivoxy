@@ -5,6 +5,7 @@ import concurrent.futures as concurrent
 
 def start(socks_port, control_port, listen_port, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
+    instance.start()
     if callback_before_wait:
         callback_before_wait(instance)
     if wait_for_initialization:
@@ -17,6 +18,8 @@ def start(socks_port, control_port, listen_port, callback_before_wait = None, wa
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     instances = [private._make_tor_privoxy_none_block(*pt) for pt in ports]
+    for i in instances:
+        i.start()
     success_factor = 1
     if "success_factor" in kwargs:
         success_factor = kwargs["success_factor"]
@@ -34,7 +37,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
                 factor = float(true_count) / float(len(is_initialized))
                 return factor >= success_factor
         def callback_to_stop():
-            return all(i.tor_process.was_destroyed() for i in instances)
+            return all(i.tor_process.was_stopped() for i in instances)
         try:
             if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = kwargs['timeout']):
                 raise TimeoutError()
@@ -56,4 +59,3 @@ def manage_multiple(ports : list, **kwargs):
     ports_len_to_run = ports * rpf
     run_ports = ports[:ports_len_to_run]
     start_multiple(run_ports, success_factor = success_factor)
-    instance.destroy()
