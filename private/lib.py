@@ -4,9 +4,7 @@ import time
 import tempfile
 import logging
 
-from stem.control import Controller
-
-_control_passwor = "12345679"
+_control_password = "12345679"
 _control_password_hash = "16:5E5D86C529E68C6460807EE16DC0299149D802594B7FA6DB49546552FE"
 __enable_logging = False
 
@@ -129,6 +127,12 @@ class _TorProcess(_Process):
             self.data_directory.cleanup()
     def id_ports(self):
         return f"({self.socks_port} {self.control_port} {self.listen_port})"
+    def get_info(self, parameter):
+        from stem.control import Controller
+        with Controller.from_port(port = self.control_port) as controller:
+            controller.authenticate()
+            return controller.get_info(parameter)
+        raise Exception(f"Cannot handle {parameter}")
 
 class _PrivoxyProcess(_Process):
     def __make_config(self, socks_port, listen_port):
