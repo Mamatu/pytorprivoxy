@@ -14,6 +14,7 @@ def start(socks_port, control_port, listen_port, callback_before_wait = None, wa
                 raise TimeoutError()
         except private._TorProcess.Stopped:
             logging.info("Interrupted")
+            instance.stop()
     return instance
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
@@ -42,13 +43,19 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
             if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = kwargs['timeout']):
                 raise TimeoutError()
         except private._TorProcess.Stopped:
+            for i in instances:
+                i.stop()
             logging.info("Interrupted")
+        except Exception as ex:
+            logging.error(f"{ex}")
     return instances
 
 def stop(instance):
     if isinstance(instance, list):
         for i in instance:
-            stop(i)
+            i.stop()
+    else:
+        stop([instance])
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]

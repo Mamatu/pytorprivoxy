@@ -4,27 +4,7 @@ import time
 import tempfile
 import logging
 
-_control_password = "12345679"
-_control_password_hash = "16:5E5D86C529E68C6460807EE16DC0299149D802594B7FA6DB49546552FE"
 __enable_logging = False
-
-def set_control_password_hash(control_hash_password):
-    global _control_password_hash
-    _control_password_hash = control_hash_password
-
-def terminate_subprocess(process):
-    import subprocess
-    import psutil
-    parent = psutil.Process(process.pid)
-    children = parent.children(recursive=True)
-    for child in children:
-        child.terminate()
-    process.terminate()
-    try:
-        process.wait(timeout = 5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout = 5)
 
 class _Process:
     def __init__(self, cmd):
@@ -48,7 +28,8 @@ class _Process:
         self.process.stdout.close()
         self.process.stderr.close()
         try:
-            terminate_subprocess(self.process)
+            from private import libterminate
+            libterminate.terminate_subprocess(self.process)
             self.process = None
         except psutil.NoSuchProcess as nsp:
             self.emit_warning_during_destroy(nsp)
@@ -61,13 +42,15 @@ class _Process:
 class _TorProcess(_Process):
     class Stopped(Exception):
         pass
+    class LineError(Exception):
+        pass
     def __make_config(self, socks_port, control_port, listen_port, data_directory_path):
-        global _control_password_hash
+        from private import libpass
         config = tempfile.NamedTemporaryFile(mode = "w")
         config.write(f"SocksPort {socks_port}\n")
         config.write(f"ControlPort {control_port}\n")
         config.write(f"DataDirectory {data_directory_path}\n")
-        config.write(f"HashedControlPassword {_control_password_hash}\n")
+        config.write(f"HashedControlPassword {libpass.get_hashed_password()}\n")
         config.flush()
         return config
     def __init__(self, socks_port, control_port, listen_port):
@@ -76,6 +59,7 @@ class _TorProcess(_Process):
         self.data_directory = tempfile.TemporaryDirectory()
         self.config = self.__make_config(socks_port, control_port, listen_port, self.data_directory.name)
         super().__init__(["tor", "-f", self.config.name])
+        self.controller = None
         self.socks_port = socks_port
         self.control_port = control_port
         self.listen_port = listen_port
@@ -89,6 +73,8 @@ class _TorProcess(_Process):
             line = self.process.stdout.readline()
             line = line.replace("\n", "")
             logging.debug(f"{self.id_ports()} {line}")
+            if "[err]" in line:
+                raise _TorProcess.LineError(str(line))
             if is_initialized_str in line:
                 logging.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
                 self.was_initialized = True
@@ -96,6 +82,8 @@ class _TorProcess(_Process):
             return False
         except Exception as ex:
             logging.error(f"{self.id_ports()} {ex}")
+            if isinstance(ex, _TorProcess.LineError):
+                raise ex
             return False
     @staticmethod
     def wait_for_initialization(callback_is_initialized, callback_to_stop, timeout = 300, delay = 0.5):
@@ -103,8 +91,12 @@ class _TorProcess(_Process):
         while True:
             if callback_to_stop():
                 raise _TorProcess.Stopped()
-            if callback_is_initialized():
-                return True
+            try:
+                if callback_is_initialized():
+                    return True
+            except Exception as ex:
+                logging.error(str(ex))
+                raise _TorProcess.Stopped()
             time.sleep(delay)
             duration = duration + delay
             if duration >= timeout:
@@ -113,12 +105,32 @@ class _TorProcess(_Process):
         """
         It is accessible by self.wait_for_initialization
         """
-        return _TorProcess.wait_for_initialization(lambda: self.is_initialized(), lambda: self.was_stopped(), timeout, delay)
+        status =  _TorProcess.wait_for_initialization(lambda: self.is_initialized(), lambda: self.was_stopped(), timeout, delay)
+        if status:
+            self.init_controller()
     def was_stopped(self):
         return self.detroy_flag
     def start(self):
         super().start()
     def stop(self):
+        self._stop()
+    def init_controller(self):
+        try:
+            from stem.control import Controller
+            self.controller = Controller.from_port(port = self.control_port)
+            from private import libpass
+            self.controller.authenticate(libpass.get_password())
+            def event_listener(event, d, events):
+                logging.info(f"event: {event}")
+            self.controller.add_event_listener(event_listener)
+            def status_listener(controller, state, number):
+                logging.info(f"status: {controller} {state} {number}")
+            self.controller.add_status_listener(status_listener)
+            logging.info(f"Init controller {self.controller}")
+        except Exception as ex:
+            self._stop()
+            raise ex
+    def _stop(self):
         self.detroy_flag = True
         super().stop(wait_for_end = True)
         if hasattr(self, "config"):
@@ -128,11 +140,7 @@ class _TorProcess(_Process):
     def id_ports(self):
         return f"({self.socks_port} {self.control_port} {self.listen_port})"
     def get_info(self, parameter):
-        from stem.control import Controller
-        with Controller.from_port(port = self.control_port) as controller:
-            controller.authenticate()
-            return controller.get_info(parameter)
-        raise Exception(f"Cannot handle {parameter}")
+        return self.controller.get_info(parameter)
 
 class _PrivoxyProcess(_Process):
     def __make_config(self, socks_port, listen_port):
@@ -158,9 +166,12 @@ class _Instance:
         self.privoxy_process = privoxy_process
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
+    def start(self):
+        self.tor_process.start()
+        self.privoxy_process.start()
     def stop(self):
-        self.privoxy_process.stop()
         self.tor_process.stop()
+        self.privoxy_process.stop()
     def wait_for_initialization(self, timeout = 60, delay = 0.5):
         try:
             return self.tor_process.wait_for_initialization(timeout, delay)

@@ -40,6 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
     parser.add_argument("--log_level", help = "logging debug: CRITICAL ERROR WARNING INFO DEBUG", type=str, default = "INFO")
     parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
+    parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
     factor_description = """
     Factor of success of initialization after what the app will be continued, otherwise it will interrupted.
     When is only one --start then it is ignored.
@@ -53,6 +54,9 @@ if __name__ == "__main__":
         else:
             logging.basicConfig(level = expected_levels[args.log_level])
     args_dict = {"timeout" : args.timeout, "success_factor" : args.success_factor}
+    if args.password_from_file:
+        from private import libpass
+        libpass.load_password_from_file(args.password_from_file)
     try:
         if args.start:
             if all(isinstance(p, list) for p in args.start):
