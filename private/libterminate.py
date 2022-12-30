@@ -10,8 +10,8 @@ def terminate_subprocess(process):
         child.terminate()
     process.terminate()
     try:
-        process.wait(timeout = 5)
+        process.wait(timeout = 1)
     except subprocess.TimeoutExpired:
         process.kill()
-        process.wait(timeout = 5)
+        process.wait(timeout = 1)
 

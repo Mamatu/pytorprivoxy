@@ -19,14 +19,12 @@ def start(socks_port, control_port, listen_port, callback_before_wait = None, wa
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     instances = [private._make_tor_privoxy_none_block(*pt) for pt in ports]
-    for i in instances:
-        i.start()
+    for i in instances: i.start()
     success_factor = 1
     if "success_factor" in kwargs:
         success_factor = kwargs["success_factor"]
     if callback_before_wait:
-        for i in instances:
-            callback_before_wait(i)
+        for i in instances: callback_before_wait(i)
     if wait_for_initialization:
         def callback_is_initialized():
             with concurrent.ThreadPoolExecutor() as executor:
@@ -38,13 +36,14 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
                 factor = float(true_count) / float(len(is_initialized))
                 return factor >= success_factor
         def callback_to_stop():
-            return all(i.tor_process.was_stopped() for i in instances)
+            return all([i.tor_process.was_stopped() for i in instances])
         try:
             if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = kwargs['timeout']):
                 raise TimeoutError()
+            else:
+                for i in instances: i.tor_process.init_controller()
         except private._TorProcess.Stopped:
-            for i in instances:
-                i.stop()
+            for i in instances: i.stop()
             logging.info("Interrupted")
         except Exception as ex:
             logging.error(f"{ex}")
@@ -52,8 +51,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
 
 def stop(instance):
     if isinstance(instance, list):
-        for i in instance:
-            i.stop()
+        for i in instance: i.stop()
     else:
         stop([instance])
 

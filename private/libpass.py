@@ -4,14 +4,16 @@ def get_password():
     global _password
     return _password
 
-def remove_whitespaces(sentence):
+def remove_whitespaces(txt):
     import re
     pattern = re.compile(r'\s+')
-    sentence = re.sub(pattern, '', sentence)
-    return sentence
+    txt = re.sub(pattern, '', txt)
+    txt = txt.strip()
+    return txt
 
 def get_hashed_password(remove_prefix = False):
     _pass = get_password()
+    print(_pass)
     import subprocess
     process = subprocess.Popen(["tor", "--hash-password", f"\"{_pass}\""], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     _hashed_pass = process.stdout.readline()
@@ -23,11 +25,12 @@ def get_hashed_password(remove_prefix = False):
     _hashed_pass = remove_whitespaces(_hashed_pass)
     if remove_prefix:
         idx = _hashed_pass.index(":")
-        return _hashed_pass[idx+1:]
+        _hashed_pass = _hashed_pass[idx+1:]
+    print(_hashed_pass)
     return _hashed_pass
 
 def load_password_from_file(filepath):
     with open(filepath, "r") as f:
         _pass = f.read()
         global _passowrd
-        _password = _pass
+        _password = remove_whitespace(_pass)

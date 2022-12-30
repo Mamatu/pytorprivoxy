@@ -1,27 +1,34 @@
 import lib
 __instances = []
 
+def _instances_append(instance):
+    global __instances
+    __instances.append(instance)
+
+def _instances_remove(instance):
+    global __instances
+    if instance in __instances:
+        __instances.remove(instance)
+
 def start(socks_port, control_port, listen_port, wait_for_initialization = True, **kwargs):
     global __instances
-    callback_before_wait = lambda instance: __instances.append(instance)
+    callback_before_wait = lambda instance: __instances_append(instance)
     instance = lib.start(socks_port, control_port, listen_port, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
     return instance
 
 def start_multiple(ports : list, wait_for_initialization = True, **kwargs):
     global __instances
-    callback_before_wait = lambda instance: __instances.append(instance)
+    callback_before_wait = lambda instance: _instances_append(instance)
     instances = lib.start_multiple(ports, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
     return instances
 
 def stop(instance):
     lib.stop(instance)
-    global __instances
-    __instances.remove(instance)
+    _instances_remove(instance)
 
 def stop_all():
     global __instances
-    for instance in __instances:
-        stop(instance)
+    for i in __instances: stop(i)
 
 import atexit
 atexit.register(stop_all)

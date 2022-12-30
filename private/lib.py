@@ -19,7 +19,8 @@ class _Process:
         logging.warning(f"{ex}: please verify if process {self.cmd} was properly closed")
     def start(self):
         self.process = subprocess.Popen(self.cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
-    def stop(self, wait_for_end = True):
+        logging.info(f"Start process {self.process}")
+    def stop(self):
         self.is_destroyed_flag = True
         if not hasattr(self, "process"):
             return
@@ -35,6 +36,7 @@ class _Process:
             self.emit_warning_during_destroy(nsp)
         except subprocess.TimeoutExpired as te:
             self.emit_warning_during_destroy(te)
+        logging.info(f"Stop process {self.process}")
     def wait(self):
         if self.process:
             self.process.wait()
@@ -50,7 +52,7 @@ class _TorProcess(_Process):
         config.write(f"SocksPort {socks_port}\n")
         config.write(f"ControlPort {control_port}\n")
         config.write(f"DataDirectory {data_directory_path}\n")
-        config.write(f"HashedControlPassword {libpass.get_hashed_password()}\n")
+        #config.write(f"HashedControlPassword {libpass.get_hashed_password()}\n")
         config.flush()
         return config
     def __init__(self, socks_port, control_port, listen_port):
@@ -106,8 +108,8 @@ class _TorProcess(_Process):
         It is accessible by self.wait_for_initialization
         """
         status =  _TorProcess.wait_for_initialization(lambda: self.is_initialized(), lambda: self.was_stopped(), timeout, delay)
-        if status:
-            self.init_controller()
+        if status: self.init_controller()
+        return status
     def was_stopped(self):
         return self.detroy_flag
     def start(self):
@@ -119,7 +121,10 @@ class _TorProcess(_Process):
             from stem.control import Controller
             self.controller = Controller.from_port(port = self.control_port)
             from private import libpass
-            self.controller.authenticate(libpass.get_password())
+            self.controller.authenticate()
+            #self.controller.authenticate(password = libpass.get_password())
+            #self.controller.authenticate(libpass.get_hashed_password())
+            #self.controller.authenticate(libpass.get_hashed_password(remove_prefix = True))
             def event_listener(event, d, events):
                 logging.info(f"event: {event}")
             self.controller.add_event_listener(event_listener)
@@ -128,11 +133,12 @@ class _TorProcess(_Process):
             self.controller.add_status_listener(status_listener)
             logging.info(f"Init controller {self.controller}")
         except Exception as ex:
+            logging.error(f"Exception: {ex} . Stopping of process")
             self._stop()
             raise ex
     def _stop(self):
         self.detroy_flag = True
-        super().stop(wait_for_end = True)
+        super().stop()
         if hasattr(self, "config"):
             self.config.close()
         if hasattr(self, "data_directory"):
