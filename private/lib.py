@@ -118,13 +118,15 @@ class _TorProcess(_Process):
         self._stop()
     def init_controller(self):
         try:
+            from stem import Signal
             from stem.control import Controller
             self.controller = Controller.from_port(port = self.control_port)
             from private import libpass
-            self.controller.authenticate()
-            #self.controller.authenticate(password = libpass.get_password())
+            #self.controller.authenticate()
+            self.controller.authenticate(password = libpass.get_password())
             #self.controller.authenticate(libpass.get_hashed_password())
             #self.controller.authenticate(libpass.get_hashed_password(remove_prefix = True))
+            self.controller.signal(Signal.NEWNYM)
             def event_listener(event, d, events):
                 logging.info(f"event: {event}")
             self.controller.add_event_listener(event_listener)
