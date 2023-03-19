@@ -188,6 +188,8 @@ class _Instance:
     def join(self):
         self.privoxy_process.wait()
         self.tor_process.wait()
+    def restart(self):
+        self.tor_process.controller.signal(Signal.NEWNYM)
 
 def _is_port_used(port : int) -> bool:
     import socket
