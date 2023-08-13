@@ -3,7 +3,7 @@ import logging
 
 import concurrent.futures as concurrent
 
-def start(socks_port, control_port, listen_port, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
     instance.start()
     if callback_before_wait:
@@ -18,6 +18,20 @@ def start(socks_port, control_port, listen_port, callback_before_wait = None, wa
     return instance
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+    def invalid_ports(ports):
+        raise Exception(f"Ports must be list of int tuple or int list (of 3 size): it is: {ports}")
+    def check_ports(ports):
+        for p in ports:
+            if isinstance(p, tuple) or isinstance(p, list):
+                if len(p) == 3:
+                    for i in p:
+                        if not isinstance(i, int):
+                            invalid_ports(ports)
+                else:
+                    invalid_ports(ports)
+            else:
+                invalid_ports(ports)
+    check_ports(ports)
     instances = [private._make_tor_privoxy_none_block(*pt) for pt in ports]
     for i in instances: i.start()
     success_factor = 1
@@ -54,6 +68,9 @@ def stop(instance):
         for i in instance: i.stop()
     else:
         stop([instance])
+
+def control(instance, cmd):
+    instance.write_telnet_cmd(cmd)
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]

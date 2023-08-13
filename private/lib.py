@@ -1,8 +1,9 @@
+import logging
 import psutil
 import subprocess
-import time
 import tempfile
-import logging
+import telnetlib
+import time
 
 __enable_logging = False
 
@@ -185,6 +186,10 @@ class _Instance:
             return self.tor_process.wait_for_initialization(timeout, delay)
         except _TorProcess.Stopped:
             return False
+    def write_telnet_cmd(self, cmd):
+        control_port = self.tor_process.control_port
+        with telnetlib.Telnet(host = "localhost", port = control_port) as tn:
+            tn.write(cmd)
     def join(self):
         self.privoxy_process.wait()
         self.tor_process.wait()
