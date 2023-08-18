@@ -72,6 +72,11 @@ def stop(instance):
 def control(instance, cmd):
     instance.write_telnet_cmd(cmd)
 
+def newnym(instance):
+    if isinstance(instance, list):
+        for i in instance: newnym(i)
+    control(instance, "SIGNAL NEWNYM")
+
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]
     success_facctor = 1.
