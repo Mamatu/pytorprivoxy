@@ -189,7 +189,13 @@ class _Instance:
     def write_telnet_cmd(self, cmd):
         control_port = self.tor_process.control_port
         with telnetlib.Telnet(host = "localhost", port = control_port) as tn:
-            tn.write(cmd)
+            write = lambda cmd: tn.write(cmd)
+            if isinstance(cmd, list) or isintance(cmd, tuple):
+                for c in cmd: write(c)
+            else:
+                write(cmd)
+    def write_telnet_cmd_and_authenticate(self, cmd):
+        self.write_telnet_cmd(["authenticate", cmd])
     def join(self):
         self.privoxy_process.wait()
         self.tor_process.wait()
