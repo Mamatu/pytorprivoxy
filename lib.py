@@ -77,6 +77,11 @@ def newnym(instance):
         for i in instance: newnym(i)
     control(instance, "SIGNAL NEWNYM")
 
+def get_url(instance):
+    if isinstance(instance, list):
+        return [get_url(i) for i in instance]
+    return instance.get_url()
+
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]
     success_facctor = 1.

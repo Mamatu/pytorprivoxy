@@ -194,6 +194,8 @@ class _Instance:
                 for c in cmd: write(c)
             else:
                 write(cmd)
+    def get_url(self):
+        return f"http://127.0.0.1:{self.control_port}"
     def write_telnet_cmd_and_authenticate(self, cmd):
         self.write_telnet_cmd(["authenticate", cmd])
     def join(self):
