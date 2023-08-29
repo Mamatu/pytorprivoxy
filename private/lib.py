@@ -117,6 +117,8 @@ class _TorProcess(_Process):
         super().start()
     def stop(self):
         self._stop()
+    def get_url(self):
+        return f"http://127.0.0.1:{self.control_port}"
     def init_controller(self):
         try:
             from stem import Signal
@@ -195,7 +197,7 @@ class _Instance:
             else:
                 write(cmd)
     def get_url(self):
-        return f"http://127.0.0.1:{self.control_port}"
+        return self.tor_process.get_url()
     def write_telnet_cmd_and_authenticate(self, cmd):
         self.write_telnet_cmd(["authenticate", cmd])
     def join(self):
