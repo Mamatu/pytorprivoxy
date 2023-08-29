@@ -55,11 +55,7 @@ if __name__ == "__main__":
     parser.add_argument("--success_factor", help = factor_description, type=float, default=1)
     args = parser.parse_args()
     if args.log_level:
-        expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
-        if not args.log_level in expected_levels.keys():
-            raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
-        else:
-            logging.basicConfig(level = expected_levels[args.log_level])
+        lib.set_logging_level(args.log_level)
     args_dict = {"timeout" : args.timeout, "success_factor" : args.success_factor}
     if args.password_from_file:
         from private import libpass

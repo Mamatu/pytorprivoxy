@@ -82,6 +82,14 @@ def get_url(instance):
         return [get_url(i) for i in instance]
     return instance.get_url()
 
+def set_logging_level(log_level):
+    import logging
+    expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
+    if not log_level in expected_levels.keys():
+        raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
+    else:
+        logging.basicConfig(level = expected_levels[log_level])
+
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]
     success_facctor = 1.
