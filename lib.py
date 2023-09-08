@@ -2,7 +2,7 @@ from private import lib as private
 import concurrent.futures as concurrent
 
 import logging
-log = log.getLogger("pytorprivoxy")
+log = logging.getLogger("pytorprivoxy")
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)

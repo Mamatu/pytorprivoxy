@@ -5,7 +5,7 @@ import tempfile
 import telnetlib
 import time
 
-log = log.getLogger("pytorprivoxy")
+log = logging.getLogger("pytorprivoxy")
 
 class _Process:
     def __init__(self, cmd):

@@ -2,7 +2,7 @@ import lib
 __instances = []
 
 import logging
-log = log.getLogger("pytorprivoxy")
+log = logging.getLogger("pytorprivoxy")
 
 def _instances_append(instance):
     global __instances
