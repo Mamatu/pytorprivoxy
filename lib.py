@@ -85,7 +85,7 @@ def get_url(instance):
 
 def set_logging_level(log_level):
     import logging
-    expected_levels = {"CRITICAL" : log.CRITICAL, "ERROR" : log.ERROR, "WARNING" : log.WARNING, "INFO" : log.INFO, "DEBUG" : log.DEBUG}
+    expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
     if not log_level in expected_levels.keys():
         raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
     else:
