@@ -5,7 +5,7 @@ import tempfile
 import telnetlib
 import time
 
-__enable_logging = False
+log = log.getLogger("pytorprivoxy")
 
 class _Process:
     def __init__(self, cmd):
@@ -17,10 +17,10 @@ class _Process:
     def was_stopped(self):
         return self.is_destroyed_flag
     def emit_warning_during_destroy(self, ex):
-        logging.warning(f"{ex}: please verify if process {self.cmd} was properly closed")
+        log.warning(f"{ex}: please verify if process {self.cmd} was properly closed")
     def start(self):
         self.process = subprocess.Popen(self.cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
-        logging.info(f"Start process {self.process}")
+        log.info(f"Start process {self.process}")
     def stop(self):
         self.is_destroyed_flag = True
         if not hasattr(self, "process"):
@@ -37,7 +37,7 @@ class _Process:
             self.emit_warning_during_destroy(nsp)
         except subprocess.TimeoutExpired as te:
             self.emit_warning_during_destroy(te)
-        logging.info(f"Stop process {self.process}")
+        log.info(f"Stop process {self.process}")
     def wait(self):
         if self.process:
             self.process.wait()
@@ -67,7 +67,7 @@ class _TorProcess(_Process):
         self.control_port = control_port
         self.listen_port = listen_port
         self.detroy_flag = False
-        logging.info(f"Instace of tor process: {self.id_ports()}")
+        log.info(f"Instace of tor process: {self.id_ports()}")
     def is_initialized(self):
         if self.was_initialized:
             return True
@@ -75,16 +75,16 @@ class _TorProcess(_Process):
         try:
             line = self.process.stdout.readline()
             line = line.replace("\n", "")
-            logging.debug(f"{self.id_ports()} {line}")
+            log.debug(f"{self.id_ports()} {line}")
             if "[err]" in line:
                 raise _TorProcess.LineError(str(line))
             if is_initialized_str in line:
-                logging.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
+                log.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
                 self.was_initialized = True
                 return True
             return False
         except Exception as ex:
-            logging.error(f"{self.id_ports()} {ex}")
+            log.error(f"{self.id_ports()} {ex}")
             if isinstance(ex, _TorProcess.LineError):
                 raise ex
             return False
@@ -98,7 +98,7 @@ class _TorProcess(_Process):
                 if callback_is_initialized():
                     return True
             except Exception as ex:
-                logging.error(str(ex))
+                log.error(str(ex))
                 raise _TorProcess.Stopped()
             time.sleep(delay)
             duration = duration + delay
@@ -131,14 +131,14 @@ class _TorProcess(_Process):
             #self.controller.authenticate(libpass.get_hashed_password(remove_prefix = True))
             self.controller.signal(Signal.NEWNYM)
             def event_listener(event, d, events):
-                logging.info(f"event: {event}")
+                log.info(f"event: {event}")
             self.controller.add_event_listener(event_listener)
             def status_listener(controller, state, number):
-                logging.info(f"status: {controller} {state} {number}")
+                log.info(f"status: {controller} {state} {number}")
             self.controller.add_status_listener(status_listener)
-            logging.info(f"Init controller {self.controller}")
+            log.info(f"Init controller {self.controller}")
         except Exception as ex:
-            logging.error(f"Exception: {ex} . Stopping of process")
+            log.error(f"Exception: {ex} . Stopping of process")
             self._stop()
             raise ex
     def _stop(self):

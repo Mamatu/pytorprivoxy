@@ -1,6 +1,9 @@
 import lib
 __instances = []
 
+import logging
+log = log.getLogger("pytorprivoxy")
+
 def _instances_append(instance):
     global __instances
     __instances.append(instance)
@@ -35,7 +38,7 @@ atexit.register(stop_all)
 
 import signal
 def signal_handler(sig, frame):
-    logging.info("Registering sig for application. It will stop all")
+    log.info("Registering sig for application. It will stop all")
     stop_all()
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -70,4 +73,4 @@ if __name__ == "__main__":
                 instance = start(*args.start, **args_dict)
                 instance.join()
     except TimeoutError as te:
-        logging.error(f"Timeout expired: {te}")
+        log.error(f"Timeout expired: {te}")

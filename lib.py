@@ -1,7 +1,8 @@
 from private import lib as private
-import logging
-
 import concurrent.futures as concurrent
+
+import logging
+log = log.getLogger("pytorprivoxy")
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
@@ -13,7 +14,7 @@ def start(socks_port : int, control_port : int, listen_port : int, callback_befo
             if not instance.wait_for_initialization(timeout = kwargs['timeout']):
                 raise TimeoutError()
         except private._TorProcess.Stopped:
-            logging.info("Interrupted")
+            log.info("Interrupted")
             instance.stop()
     return instance
 
@@ -58,9 +59,9 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
                 for i in instances: i.tor_process.init_controller()
         except private._TorProcess.Stopped:
             for i in instances: i.stop()
-            logging.info("Interrupted")
+            log.info("Interrupted")
         except Exception as ex:
-            logging.error(f"{ex}")
+            log.error(f"{ex}")
     return instances
 
 def stop(instance):
@@ -84,11 +85,11 @@ def get_url(instance):
 
 def set_logging_level(log_level):
     import logging
-    expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
+    expected_levels = {"CRITICAL" : log.CRITICAL, "ERROR" : log.ERROR, "WARNING" : log.WARNING, "INFO" : log.INFO, "DEBUG" : log.DEBUG}
     if not log_level in expected_levels.keys():
         raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
     else:
-        logging.basicConfig(level = expected_levels[log_level])
+        log.basicConfig(level = expected_levels[log_level])
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]
