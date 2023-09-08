@@ -5,8 +5,10 @@ import logging
 import sys
 log = logging.getLogger("pytorprivoxy")
 
+from pylibcommons import libprint
+
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-    log.debug(f"start {socks_port} {control_port} {listen_port}")
+    libprint.print_func_info(prefix = "+", logger = log.debug)
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
     instance.start()
     if callback_before_wait:
@@ -18,10 +20,11 @@ def start(socks_port : int, control_port : int, listen_port : int, callback_befo
         except private._TorProcess.Stopped:
             log.info("Interrupted")
             instance.stop()
+    libprint.print_func_info(prefix = "-", logger = log.debug)
     return instance
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-    log.debug(f"start_multiple {ports}")
+    libprint.print_func_info(prefix = "+", logger = log.debug)
     def invalid_ports(ports):
         raise Exception(f"Ports must be list of int tuple or int list (of 3 size): it is: {ports}")
     def check_ports(ports):
@@ -65,6 +68,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
             log.info("Interrupted")
         except Exception as ex:
             log.error(f"{ex}")
+    libprint.print_func_info(prefix = "-", logger = log.debug)
     return instances
 
 def stop(instance):
