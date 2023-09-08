@@ -89,7 +89,7 @@ def set_logging_level(log_level):
     if not log_level in expected_levels.keys():
         raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
     else:
-        log.basicConfig(level = expected_levels[log_level])
+        log.setLevel(level = expected_levels[log_level])
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]
