@@ -69,8 +69,10 @@ class _TorProcess(_Process):
         self.detroy_flag = False
         log.info(f"Instace of tor process: {self.id_ports()}")
     def is_initialized(self):
+        log.info(f"is_initialized 1")
         if self.was_initialized:
             return True
+        log.info(f"is_initialized 2")
         is_initialized_str = "Bootstrapped 100% (done): Done"
         try:
             line = self.process.stdout.readline()
