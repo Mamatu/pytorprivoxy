@@ -52,7 +52,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
             with concurrent.ThreadPoolExecutor() as executor:
                 def is_initialized_async(i):
                     is_init = i.tor_process.is_initialized()
-                    libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{i}.tor_process.is_initialized() = {output}")
+                    libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{i}.tor_process.is_initialized() = {is_init}")
                     return is_init
                 libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
                 futures = [executor.submit(is_initialized_async, i) for i in instances]
