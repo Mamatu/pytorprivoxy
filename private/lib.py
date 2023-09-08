@@ -75,7 +75,7 @@ class _TorProcess(_Process):
         try:
             line = self.process.stdout.readline()
             line = line.replace("\n", "")
-            log.debug(f"{self.id_ports()} {line}")
+            log.info(f"{self.id_ports()} {line}")
             if "[err]" in line:
                 raise _TorProcess.LineError(str(line))
             if is_initialized_str in line:
