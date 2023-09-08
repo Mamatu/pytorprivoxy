@@ -59,6 +59,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
                 is_initialized = [f.result() for f in futures]
                 true_count = len([1 for i in is_initialized if i is True])
                 factor = float(true_count) / float(len(is_initialized))
+                libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances} {factor} >= {success_factor}")
                 return factor >= success_factor
         def callback_to_stop():
             return all([i.tor_process.was_stopped() for i in instances])
