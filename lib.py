@@ -6,7 +6,7 @@ import sys
 log = logging.getLogger("pytorprivoxy")
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-    log.info(f"start {socks_port} {control_port} {listen_port}")
+    log.debug(f"start {socks_port} {control_port} {listen_port}")
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
     instance.start()
     if callback_before_wait:
@@ -21,7 +21,7 @@ def start(socks_port : int, control_port : int, listen_port : int, callback_befo
     return instance
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-    log.info(f"start_multiple {ports}")
+    log.debug(f"start_multiple {ports}")
     def invalid_ports(ports):
         raise Exception(f"Ports must be list of int tuple or int list (of 3 size): it is: {ports}")
     def check_ports(ports):
