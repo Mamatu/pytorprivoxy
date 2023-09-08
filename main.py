@@ -45,10 +45,10 @@ signal.signal(signal.SIGINT, signal_handler)
 
 if __name__ == "__main__":
     import argparse
-    import logging
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
     parser.add_argument("--log_level", help = "logging debug: CRITICAL ERROR WARNING INFO DEBUG", type=str, default = "INFO")
+    parser.add_argument("--stdout", help = "logging into stdout", action='store_true')
     parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
     parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
     factor_description = """
@@ -59,6 +59,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.log_level:
         lib.set_logging_level(args.log_level)
+    if args.stdout:
+        lib.enable_stdout()
     args_dict = {"timeout" : args.timeout, "success_factor" : args.success_factor}
     if args.password_from_file:
         from private import libpass

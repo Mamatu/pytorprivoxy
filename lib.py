@@ -2,6 +2,7 @@ from private import lib as private
 import concurrent.futures as concurrent
 
 import logging
+import sys
 log = logging.getLogger("pytorprivoxy")
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
@@ -84,12 +85,15 @@ def get_url(instance):
     return instance.get_url()
 
 def set_logging_level(log_level):
-    import logging
     expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
     if not log_level in expected_levels.keys():
         raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
     else:
         log.setLevel(level = expected_levels[log_level])
+
+def enable_stdout():
+    handler = logging.StreamHandler(sys.stdout)
+    log.addHandler(handler)
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]
