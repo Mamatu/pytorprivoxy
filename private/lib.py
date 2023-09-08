@@ -118,10 +118,10 @@ class _TorProcess(_Process):
         finally:
             libprint.print_func_info(prefix = "-", logger = log.debug)
     def _instance_wait_for_initialization(self, timeout = 300, delay = 0.5):
-        libprint.print_func_info(prefix = "+", logger = log.debug)
         """
         It is accessible by self.wait_for_initialization
         """
+        libprint.print_func_info(prefix = "+", logger = log.debug)
         status =  _TorProcess.wait_for_initialization(lambda: self.is_initialized(), lambda: self.was_stopped(), timeout, delay)
         if status: self.init_controller()
         libprint.print_func_info(prefix = "-", logger = log.debug)

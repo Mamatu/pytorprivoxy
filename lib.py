@@ -46,6 +46,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
         success_factor = kwargs["success_factor"]
     if callback_before_wait:
         for i in instances: callback_before_wait(i)
+    libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
     if wait_for_initialization:
         def callback_is_initialized():
             with concurrent.ThreadPoolExecutor() as executor:
@@ -59,6 +60,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
         def callback_to_stop():
             return all([i.tor_process.was_stopped() for i in instances])
         try:
+            libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
             if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = kwargs['timeout']):
                 raise TimeoutError()
             else:
