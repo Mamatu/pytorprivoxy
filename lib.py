@@ -79,6 +79,9 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
             log.info("Interrupted")
         except Exception as ex:
             log.error(f"{ex}")
+            import traceback
+            tb = traceback.format_exc()
+            log.error(tb)
     libprint.print_func_info(prefix = "-", logger = log.debug)
     return instances
 
