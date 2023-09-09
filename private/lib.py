@@ -136,7 +136,7 @@ class _TorProcess(_Process):
     def stop(self):
         self._stop()
     def get_url(self):
-        return f"http://127.0.0.1:{self.socks_port}"
+        return f"http://127.0.0.1:{self.listen_port}"
     def init_controller(self):
         try:
             libprint.print_func_info(prefix = "+", logger = log.debug)
