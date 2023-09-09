@@ -70,7 +70,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
         try:
             timeout = libkw.handle_kwargs("timeout", default_output = 300, **kwargs)
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"instances = {instances}, timeout = {timeout}")
-            if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = kwargs['timeout']):
+            if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = timeout):
                 libprint.print_func_info(prefix = "*", logger = log.error)
                 raise TimeoutError()
             else:
