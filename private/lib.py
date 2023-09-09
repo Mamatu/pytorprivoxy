@@ -110,6 +110,9 @@ class _TorProcess(_Process):
                         return True
                 except Exception as ex:
                     log.error(str(ex))
+                    import traceback
+                    tb = traceback.format_exc()
+                    log.error(tb)
                     raise _TorProcess.Stopped()
                 time.sleep(delay)
                 duration = duration + delay
