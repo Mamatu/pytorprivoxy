@@ -40,6 +40,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
                 invalid_ports(ports)
     check_ports(ports)
     instances = [private._make_tor_privoxy_none_block(*pt) for pt in ports]
+    libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
     for i in instances: i.start()
     success_factor = 1
     if "success_factor" in kwargs:
@@ -49,6 +50,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
     libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
     if wait_for_initialization:
         def callback_is_initialized():
+            libprint.print_func_info(prefix = "+", logger = log.debug, extra_string = f"{instances}")
             with concurrent.ThreadPoolExecutor() as executor:
                 def is_initialized_async(i):
                     is_init = i.tor_process.is_initialized()
@@ -60,12 +62,14 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
                 true_count = len([1 for i in is_initialized if i is True])
                 factor = float(true_count) / float(len(is_initialized))
                 libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances} {factor} >= {success_factor}")
+                libprint.print_func_info(prefix = "-", logger = log.debug, extra_string = f"{instances}")
                 return factor >= success_factor
         def callback_to_stop():
             return all([i.tor_process.was_stopped() for i in instances])
         try:
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
             if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = kwargs['timeout']):
+                libprint.print_func_info(prefix = "*", logger = log.error)
                 raise TimeoutError()
             else:
                 for i in instances: i.tor_process.init_controller()
