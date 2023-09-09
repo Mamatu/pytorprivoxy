@@ -65,6 +65,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
                 libprint.print_func_info(prefix = "-", logger = log.debug, extra_string = f"{instances}")
                 return factor >= success_factor
         def callback_to_stop():
+            libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
             return all([i.tor_process.was_stopped() for i in instances])
         try:
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
