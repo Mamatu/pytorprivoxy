@@ -10,6 +10,7 @@ log = logging.getLogger("pytorprivoxy")
 from pylibcommons import libprint
 
 class _Process:
+    log = log.getChild(__name__)
     def __init__(self, cmd):
         self.is_destroyed_flag = False
         import threading
@@ -195,6 +196,7 @@ class _PrivoxyProcess(_Process):
             self.config.close()
 
 class _Instance:
+    log = log.getChild(__name__)
     def __init__(self, tor_process, privoxy_process):
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
@@ -218,6 +220,7 @@ class _Instance:
             if isinstance(cmd, list) or isinstance(cmd, tuple):
                 for c in cmd: write(c)
             else:
+                log.info(f"telnet {tn} write: {cmd}")
                 write(cmd)
     def get_url(self):
         return self.tor_process.get_url()
