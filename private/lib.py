@@ -215,7 +215,7 @@ class _Instance:
         control_port = self.tor_process.control_port
         with telnetlib.Telnet(host = "localhost", port = control_port) as tn:
             write = lambda cmd: tn.write(cmd)
-            if isinstance(cmd, list) or isintance(cmd, tuple):
+            if isinstance(cmd, list) or isinstance(cmd, tuple):
                 for c in cmd: write(c)
             else:
                 write(cmd)
