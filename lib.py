@@ -8,6 +8,16 @@ log = logging.getLogger("pytorprivoxy")
 from pylibcommons import libprint, libkw
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+    """
+    Starts a TorPrivoxy instance
+    :param socks_port: socks port
+    :param control_port: control port
+    :param listen_port: listen port
+    :param callback_before_wait: callback to be called before waiting for initialization
+    :param wait_for_initialization: wait for initialization
+    :param kwargs: kwargs
+    :return: TorPrivoxy instance
+    """
     libprint.print_func_info(prefix = "+", logger = log.debug)
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
     instance.start()
@@ -24,6 +34,14 @@ def start(socks_port : int, control_port : int, listen_port : int, callback_befo
     return instance
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+    """
+    Starts multiple TorPrivoxy instances
+    :param ports: list of ports
+    :param callback_before_wait: callback to be called before waiting for initialization
+    :param wait_for_initialization: wait for initialization
+    :param kwargs: kwargs
+    :return: list of TorPrivoxy instances
+    """
     libprint.print_func_info(prefix = "+", logger = log.debug)
     def invalid_ports(ports):
         raise Exception(f"Ports must be list of int tuple or int list (of 3 size): it is: {ports}")
@@ -87,25 +105,51 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
     return instances
 
 def stop(instance):
+    """
+    Stops a TorPrivoxy instance
+    :param instance: TorPrivoxy instance
+    :return: None
+    """
     if isinstance(instance, list):
         for i in instance: i.stop()
     else:
         stop([instance])
 
 def control(instance, cmd):
+    """
+    Sends a telnet command to a TorPrivoxy instance
+    :param instance: TorPrivoxy instance
+    :param cmd: command
+    :return: None
+    """
     instance.write_telnet_cmd(cmd)
 
 def newnym(instance):
+    """
+    Sends a newnym command to a TorPrivoxy instance
+    :param instance: TorPrivoxy instance
+    :return: None
+    """
     if isinstance(instance, list):
         for i in instance: newnym(i)
     control(instance, "SIGNAL NEWNYM")
 
 def get_url(instance):
+    """
+    Gets the url of a TorPrivoxy instance
+    :param instance: TorPrivoxy instance
+    :return: url
+    """
     if isinstance(instance, list):
         return [get_url(i) for i in instance]
     return instance.get_url()
 
 def set_logging_level(log_level):
+    """
+    Sets the logging level
+    :param log_level: logging level
+    :return: None
+    """
     expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
     if not log_level in expected_levels.keys():
         raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
@@ -113,10 +157,19 @@ def set_logging_level(log_level):
         log.setLevel(level = expected_levels[log_level])
 
 def enable_stdout():
+    """
+    Enables stdout logging
+    """
     handler = logging.StreamHandler(sys.stdout)
     log.addHandler(handler)
 
 def manage_multiple(ports : list, **kwargs):
+    """
+    Manages multiple TorPrivoxy instances
+    :param ports: list of ports
+    :param kwargs: kwargs
+    :return: None
+    """
     rpf = kwargs["runnig_pool_factor"]
     success_facctor = 1.
     if "success_factor" in kwargs:
