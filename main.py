@@ -29,8 +29,19 @@ def stop(instance):
     lib.stop(instance)
     _instances_remove(instance)
 
+_named_fifo_path = None
+
+def stop_named_fifo():
+    global _named_fifo_path
+    if _named_fifo_path:
+        import os, stat
+        if os.path.exists(_named_fifo_path) and stat.S_ISFIFO(os.stat(_named_fifo_path).st_mode):
+            os.system(f"echo \"stop\" > {_named_fifo_path}")
+            os.remove(_named_fifo_path)
+
 def stop_all():
     global __instances
+    stop_named_fifo()
     for i in __instances: stop(i)
 
 import atexit
@@ -44,6 +55,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 if __name__ == "__main__":
+    import os
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
@@ -51,6 +63,7 @@ if __name__ == "__main__":
     parser.add_argument("--stdout", help = "logging into stdout", action='store_true')
     parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
     parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
+    parser.add_argument("--mkfifo", help = "Make named pipe to comunicate with privoxy", type=str, default="/tmp/privoxy.fifo")
     factor_description = """
     Factor of success of initialization after what the app will be continued, otherwise it will interrupted.
     When is only one --start then it is ignored.
@@ -67,8 +80,12 @@ if __name__ == "__main__":
         libpass.load_password_from_file(args.password_from_file)
     try:
         if args.start:
+            mkfifo = None
+            if args.mkfifo:
+                mkfifo = args.mkfifo
+                _named_fifo_path = mkfifo
             if all(isinstance(p, list) for p in args.start):
-                instances = start_multiple(args.start, **args_dict)
+                instances = start_multiple(args.start, **args_dict, mkfifo = mkfifo)
                 for instance in instances:
                     instance.join()
             else:

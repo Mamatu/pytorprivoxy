@@ -1,4 +1,5 @@
 from private import lib as private
+from private import libfifo as pfifo
 import concurrent.futures as concurrent
 
 import logging
@@ -21,6 +22,7 @@ def start(socks_port : int, control_port : int, listen_port : int, callback_befo
             log.info("Interrupted")
             instance.stop()
     libprint.print_func_info(prefix = "-", logger = log.debug)
+    _mkfifo([instance], **kwargs)
     return instance
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
@@ -83,6 +85,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
             import traceback
             tb = traceback.format_exc()
             log.error(tb)
+    _mkfifo(instances, **kwargs)
     libprint.print_func_info(prefix = "-", logger = log.debug)
     return instances
 
@@ -111,6 +114,13 @@ def set_logging_level(log_level):
         raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
     else:
         log.setLevel(level = expected_levels[log_level])
+
+def _mkfifo(instances, **kwargs):
+    import re
+    mkfifo = libkw.handle_kwargs("mkfifo", default_output = None, **kwargs)
+    if mkfifo:
+        thread = pfifo.start(mkfifo, instances)
+    return thread
 
 def enable_stdout():
     handler = logging.StreamHandler(sys.stdout)

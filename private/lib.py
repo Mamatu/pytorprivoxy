@@ -1,7 +1,6 @@
 import psutil
 import subprocess
 import tempfile
-import telnetlib
 import time
 
 import logging
@@ -189,11 +188,15 @@ class _PrivoxyProcess(_Process):
         return config
     def __init__(self, socks_port, listen_port):
         self.config = self.__make_config(socks_port, listen_port)
+        self.socks_port = socks_port
+        self.listen_port = listen_port
         super().__init__(["privoxy", "--no-daemon", self.config.name])
     def stop(self):
         super().stop()
         if hasattr(self, "config"):
             self.config.close()
+    def get_listen_port(self):
+        return self.listen_port
 
 class _Instance:
     log = log.getChild(__name__)
@@ -214,17 +217,13 @@ class _Instance:
         except _TorProcess.Stopped:
             return False
     def write_telnet_cmd(self, cmd):
-        control_port = self.tor_process.control_port
-        with telnetlib.Telnet(host = "localhost", port = control_port) as tn:
-            write = lambda cmd: tn.write(cmd.encode("ascii"))
-            if isinstance(cmd, list) or isinstance(cmd, tuple):
-                for c in cmd: write(c)
-            else:
-                log.info(f"telnet {tn} write: {cmd}")
-                write(cmd)
+        from private import libtelnet
+        libtelnet.write("localhost", self.tor_process.control_port, cmd)
     def get_url(self):
         return self.tor_process.get_url()
-    def write_telnet_cmd_and_authenticate(self, cmd):
+    def get_privoxy_listen_port(self):
+        return self.privoxy_process.get_listen_port()
+    def write_telnet_cmd_authenticate(self, cmd):
         self.write_telnet_cmd(["authenticate", cmd])
     def join(self):
         self.privoxy_process.wait()
