@@ -49,6 +49,7 @@ def _get_commands(fifo_path, instances):
                 instance.write_telnet_cmd_authenticate(f"SIGNAL NEWNYM")
     _commands["newnym"] = _newnym
     def _checkip(fifo_path, instances, args):
+        libprint.print_func_info(prefix = "+", logger = log.info)
         if len(args) <= 1:
             extra_string = f"checkip: it requires more than 1 argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
@@ -80,6 +81,7 @@ def _get_commands(fifo_path, instances):
                 else:
                     extra_string = f"checkip: no stdout"
                     libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
+        libprint.print_func_info(prefix = "-", logger = log.info)
     _commands["checkip"] = _checkip
     return _commands
 
