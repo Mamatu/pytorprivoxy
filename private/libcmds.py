@@ -65,6 +65,7 @@ def get_commands(instances):
                 else:
                     extra_string = f"checkip: no stdout"
                     libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
+        libprint.print_func_info(prefix = "-", logger = log.info)
     _commands["checkip"] = _checkip
     return _commands
 
