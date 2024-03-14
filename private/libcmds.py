@@ -5,17 +5,10 @@ import os
 
 log = logging.getLogger("pytorprivoxy")
 
-def start(fifo_path, instances):
-    import threading
-    thread = threading.Thread(target = _thread_func, args = [fifo_path, instances])
-    thread.setDaemon(True)
-    thread.start()
-    return thread
+def handle_line(line, instances):
+    return _handle_line(line, instances)
 
-class _StopExecution:
-    pass
-
-def _get_commands(fifo_path, instances):
+def get_commands(instances):
     def convert(a):
         try:
             if a == "all":
@@ -26,19 +19,19 @@ def _get_commands(fifo_path, instances):
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             raise ve
     _commands = {}
-    def _stop(fifo_path, instances, args):
-        return _StopExecution()
+    def _stop(instances, args):
+        from private.libserver import StopExecution
+        return StopExecution()
     _commands["stop"] = _stop
-    def _read(fifo_path, instances, args):
-        if len(args) != 1 or not isinstance(args[0], str):
-            extra_string = f"read: args does not contain path to fifo"
+    def _read(instances, args):
+        if len(args) != 0:
+            extra_string = f"read: it requires no argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
         ports = [(i.tor_process.socks_port, i.tor_process.control_port, i.tor_process.listen_port) for i in instances]
-        with open(args[0], "w") as file:
-            file.write(str(ports))
+        return str(ports)
     _commands["read"] = _read
-    def _newnym(fifo_path, instances, args):
+    def _newnym(instances, args):
         control_ports = [convert(a) for a in args]
         is_all = [x for x in control_ports if x == "all"]
         is_all = any(is_all)
@@ -48,18 +41,11 @@ def _get_commands(fifo_path, instances):
             if is_all or is_this_port:
                 instance.write_telnet_cmd_authenticate(f"SIGNAL NEWNYM")
     _commands["newnym"] = _newnym
-    def _checkip(fifo_path, instances, args):
-        libprint.print_func_info(prefix = "+", logger = log.info)
-        if len(args) <= 1:
-            extra_string = f"checkip: it requires more than 1 argument"
+    def _checkip(instances, args):
+        if len(args) > 0:
+            extra_string = f"checkip: it requires at least a one argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
-        reverse_fifo_path = args[0]
-        if not os.path.exists(reverse_fifo_path):
-            extra_string = f"checkip: the first argument must be fifo path and it is {reverse_fifo_path} and it does not exist"
-            libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
-            return
-        args = args[1:]
         privoxy_ports = [convert(a) for a in args]
         is_all = [x for x in privoxy_ports if x == "all"]
         is_all = any(is_all)
@@ -75,9 +61,7 @@ def _get_commands(fifo_path, instances):
                 libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"After command {command}")
                 if process.is_stdout():
                     stdout = process.get_stdout()
-                    with open(reverse_fifo_path, "w") as f:
-                        for line in stdout.readlines():
-                            f.write(line)
+                    return "\n".join(stdout.readlines())
                 else:
                     extra_string = f"checkip: no stdout"
                     libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
@@ -85,7 +69,7 @@ def _get_commands(fifo_path, instances):
     _commands["checkip"] = _checkip
     return _commands
 
-def _handle_line(line, fifo_path, instances):
+def _handle_line(line, instances):
     import re
     line = line.rstrip()
     libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"read named fifo line: {line}")
@@ -101,13 +85,3 @@ def _handle_line(line, fifo_path, instances):
         return handle_cmds[command[0]](fifo_path, instances, command[1:])
     else:
         libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"Does not found handler for command {command[0]}")
-
-def _thread_func(fifo_path, instances):
-    import os
-    os.mkfifo(fifo_path)
-    while True:
-        with open(fifo_path, "r") as file:
-            line = file.readline()
-            output = _handle_line(line, fifo_path, instances)
-            if isinstance(output, _StopExecution):
-                return

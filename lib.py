@@ -1,12 +1,11 @@
 from private import lib as private
-from private import libfifo as pfifo
 import concurrent.futures as concurrent
 
 import logging
 import sys
 log = logging.getLogger("pytorprivoxy")
 
-from pylibcommons import libprint, libkw
+from pylibcommons import libprint, libkw, libserver
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(prefix = "+", logger = log.debug)
@@ -22,8 +21,10 @@ def start(socks_port : int, control_port : int, listen_port : int, callback_befo
             log.info("Interrupted")
             instance.stop()
     libprint.print_func_info(prefix = "-", logger = log.debug)
-    _mkfifo([instance], **kwargs)
-    return instance
+    server = _try_create_server([instance], **kwargs)
+    if server is None:
+        return instance
+    return (instance, server)
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(prefix = "+", logger = log.debug)
@@ -85,9 +86,11 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
             import traceback
             tb = traceback.format_exc()
             log.error(tb)
-    _mkfifo(instances, **kwargs)
+    server = _try_create_server(instances, **kwargs)
     libprint.print_func_info(prefix = "-", logger = log.debug)
-    return instances
+    if server is None:
+        return instances
+    return (instances, server)
 
 def stop(instance):
     if isinstance(instance, list):
@@ -115,12 +118,20 @@ def set_logging_level(log_level):
     else:
         log.setLevel(level = expected_levels[log_level])
 
-def _mkfifo(instances, **kwargs):
-    import re
-    mkfifo = libkw.handle_kwargs("mkfifo", default_output = None, **kwargs)
-    if mkfifo:
-        thread = pfifo.start(mkfifo, instances)
-    return thread
+def _try_create_server(instances, **kwargs):
+    server_port = libkw.handle_kwargs("server", default_output = None, **kwargs)
+    if server_port is not None:
+        from private import libcmds
+        def handler(line, client):
+            output = libcmds.handle_line(line)
+            if isinstance(output, str):
+                client.send(output)
+            return output
+        address = ("localhost", server_port)
+        server = libserver.run(handler, address)
+        libprint.print_func_info(extra_string = f"Multiprocess server {server} run on {address}", logger = log.info)
+        return server
+    return None
 
 def enable_stdout():
     handler = logging.StreamHandler(sys.stdout)
