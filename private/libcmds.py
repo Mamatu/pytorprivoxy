@@ -21,7 +21,7 @@ def _get_commands(instances):
     _commands = {}
     def _stop(instances, args):
         libprint.print_func_info(logger = log.debug)
-        from private.libserver import StopExecution
+        from pylibcommons.libserver import StopExecution
         return StopExecution()
     _commands["stop"] = _stop
     def _read(instances, args):
