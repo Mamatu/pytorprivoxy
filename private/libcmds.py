@@ -53,6 +53,7 @@ def _get_commands(instances):
         privoxy_ports = [convert(a) for a in args]
         is_all = [x for x in privoxy_ports if x == "all"]
         is_all = any(is_all)
+        output = None
         for instance in instances:
             is_this_port = [x for x in privoxy_ports if x == instance.privoxy_process.listen_port]
             is_this_port = any(is_this_port)
@@ -65,10 +66,13 @@ def _get_commands(instances):
                 libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"After command {command}")
                 if process.is_stdout():
                     stdout = process.get_stdout()
-                    return "\n".join(stdout.readlines())
+                    if output is None:
+                        output = ""
+                    output = output + "\n".join(stdout.readlines())
                 else:
                     extra_string = f"checkip: no stdout"
                     libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
+        return output
     _commands["checkip"] = _checkip
     return _commands
 
