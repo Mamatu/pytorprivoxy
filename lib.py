@@ -116,18 +116,27 @@ def set_logging_level(log_level):
     if not log_level in expected_levels.keys():
         raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
     else:
-        log.setLevel(level = expected_levels[log_level])
+        loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+        for log in loggers:
+            log.setLevel(level = expected_levels[log_level])
 
 def _try_create_server(instances, **kwargs):
     server_port = libkw.handle_kwargs("server", default_output = None, **kwargs)
     if server_port is not None:
+        from pylibcommons import libserver
         from private import libcmds
         def handler(line, client):
-            output = libcmds.handle_line(line)
-            if isinstance(output, str):
-                client.send(output)
-            return output
+            try:
+                libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"line {line}")
+                output = libcmds.handle_line(line, instances)
+                libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"output {output} for line {line}")
+                if isinstance(output, str):
+                    client.send(output)
+                return output
+            except Exception as ex:
+                libprint.print_func_info(extra_string = f"{ex}", logger = log.error)
         address = ("localhost", server_port)
+        libprint.print_func_info(prefix = "+", logger = log.debug)
         server = libserver.run(handler, address)
         libprint.print_func_info(extra_string = f"Multiprocess server {server} run on {address}", logger = log.info)
         return server

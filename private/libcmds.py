@@ -3,12 +3,12 @@ import logging
 
 import os
 
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger(__name__)
 
 def handle_line(line, instances):
     return _handle_line(line, instances)
 
-def get_commands(instances):
+def _get_commands(instances):
     def convert(a):
         try:
             if a == "all":
@@ -20,10 +20,12 @@ def get_commands(instances):
             raise ve
     _commands = {}
     def _stop(instances, args):
+        libprint.print_func_info(logger = log.debug)
         from private.libserver import StopExecution
         return StopExecution()
     _commands["stop"] = _stop
     def _read(instances, args):
+        libprint.print_func_info(logger = log.debug)
         if len(args) != 0:
             extra_string = f"read: it requires no argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
@@ -32,6 +34,7 @@ def get_commands(instances):
         return str(ports)
     _commands["read"] = _read
     def _newnym(instances, args):
+        libprint.print_func_info(logger = log.debug)
         control_ports = [convert(a) for a in args]
         is_all = [x for x in control_ports if x == "all"]
         is_all = any(is_all)
@@ -42,7 +45,8 @@ def get_commands(instances):
                 instance.write_telnet_cmd_authenticate(f"SIGNAL NEWNYM")
     _commands["newnym"] = _newnym
     def _checkip(instances, args):
-        if len(args) > 0:
+        libprint.print_func_info(logger = log.debug)
+        if len(args) == 0:
             extra_string = f"checkip: it requires at least a one argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
@@ -65,23 +69,23 @@ def get_commands(instances):
                 else:
                     extra_string = f"checkip: no stdout"
                     libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
-        libprint.print_func_info(prefix = "-", logger = log.info)
     _commands["checkip"] = _checkip
     return _commands
 
 def _handle_line(line, instances):
     import re
     line = line.rstrip()
-    libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"read named fifo line: {line}")
+    libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
     command = re.split('\s+', line)
     if len(command) == 0:
         libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"line does not contain any command")
         return
-    handle_cmds = _get_commands(fifo_path, instances)
+    handle_cmds = _get_commands(instances)
     args = []
     if len(command) > 1:
         args = command[1:]
     if command[0] in handle_cmds.keys():
-        return handle_cmds[command[0]](fifo_path, instances, command[1:])
+        libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"{command[0]} {command[1:]}")
+        return handle_cmds[command[0]](instances, command[1:])
     else:
-        libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"Does not found handler for command {command[0]}")
+        libprint.print_func_info(prefix = "-", logger = log.error, extra_string = f"Does not found handler for command {command[0]}")

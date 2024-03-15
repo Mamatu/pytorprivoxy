@@ -1,6 +1,9 @@
 import lib
 __instances = []
 
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL)
+
 import logging
 log = logging.getLogger("pytorprivoxy")
 
@@ -55,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("--stdout", help = "logging into stdout", action='store_true')
     parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
     parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
-    parser.add_argument("--server", help = "Establish server to multiprocess communication. As argument it takes listen port", type=int, default=7000)
+    parser.add_argument("--server", help = "Establish server to multiprocess communication. As argument it takes listen port", type=int, default=None)
     factor_description = """
     Factor of success of initialization after what the app will be continued, otherwise it will interrupted.
     When is only one --start then it is ignored.
@@ -73,21 +76,20 @@ if __name__ == "__main__":
     try:
         if args.start:
             server = None
-            if args.server:
-                server = args.server
             if all(isinstance(p, list) for p in args.start):
-                instances = start_multiple(args.start, **args_dict, server = server)
+                instances = start_multiple(args.start, **args_dict, server = args.server)
                 server = None
+                print(instances)
                 if isinstance(instances, tuple):
-                    instances = instances[0]
                     server = instances[1]
+                    instances = instances[0]
                 for instance in instances:
                     instance.join()
             else:
-                instance = start(*args.start, **args_dict)
+                instance = start(*args.start, **args_dict, server = args.server)
                 if isinstance(instances, tuple):
-                    instances = instances[0]
                     server = instances[1]
+                    instances = instances[0]
                 instance.join()
     except TimeoutError as te:
         log.error(f"Timeout expired: {te}")
