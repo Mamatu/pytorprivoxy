@@ -6,6 +6,7 @@ import os
 log = logging.getLogger(__name__)
 
 def handle_line(line, instances):
+    libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
     return _handle_line(line, instances)
 
 def _get_commands(instances):
