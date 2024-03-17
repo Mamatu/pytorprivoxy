@@ -1,6 +1,6 @@
 from private import lib as private
+from private import libcmds
 import concurrent.futures as concurrent
-
 import logging
 import sys
 log = logging.getLogger("pytorprivoxy")
@@ -124,7 +124,6 @@ def _try_create_server(instances, **kwargs):
     server_port = libkw.handle_kwargs("server", default_output = None, **kwargs)
     if server_port is not None:
         from pylibcommons import libserver
-        from private import libcmds
         def handler(line, client):
             try:
                 libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"line {line}")
