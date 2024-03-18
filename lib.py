@@ -5,6 +5,7 @@ import logging
 import sys
 log = logging.getLogger("pytorprivoxy")
 
+from private import libcmds
 from pylibcommons import libprint, libkw, libserver
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
@@ -124,7 +125,6 @@ def _try_create_server(instances, **kwargs):
     server_port = libkw.handle_kwargs("server", default_output = None, **kwargs)
     if server_port is not None:
         from pylibcommons import libserver
-        from private import libcmds
         def handler(line, client):
             try:
                 libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"line {line}")
