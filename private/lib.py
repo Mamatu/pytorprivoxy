@@ -10,6 +10,8 @@ log = logging.getLogger("pytorprivoxy")
 
 from pylibcommons import libprint
 
+import concurrent.futures as concurrent
+
 class _Process:
     log = log.getChild(__name__)
     def __init__(self):
@@ -204,31 +206,50 @@ class _PrivoxyProcess(_Process):
     def get_listen_port(self):
         return self.listen_port
 
+import enum
+class InitializationState(enum.Enum):
+    OK = 0,
+    TIMEOUT = 1,
+    STOPPED = 2
+
 class _Instance:
     log = log.getChild(__name__)
     def __init__(self, tor_process, privoxy_process):
+        self.usable = False
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
         self.quit = False
         self.cv = threading.Condition()
+        self._executor = None
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
-    def start(self):
+    def start(self, timeout = 60, delay = 0.5):
         self.tor_process.start()
         self.privoxy_process.start()
+        return self._run_initialization()
     def stop(self):
         self._stop()
         with self.cv:
             self.quit = True
             self.cv.notify()
     def _stop(self):
+        self.usable = False
         self.tor_process.stop()
         self.privoxy_process.stop()
-    def wait_for_initialization(self, timeout = 60, delay = 0.5):
-        try:
-            return self.tor_process.wait_for_initialization(timeout, delay)
-        except _TorProcess.Stopped:
-            return False
+    def _run_initialization(self, timeout = 60, delay = 0.5):
+        def thread_func(self, timeout, delay):
+            try:
+                output = self.tor_process.wait_for_initialization(timeout, delay)
+                if output:
+                    self.usable = True
+                    return InitializationState.OK
+                else:
+                    return InitializationState.TIMEOUT
+            except InitializationState.STOPPED:
+                return False
+        if self._executor is None:
+            self._executor = concurrent.ThreadPoolExecutor()
+        return self._executor.submit(thread_func, self, timeout, delay)
     def write_telnet_cmd(self, cmd):
         from private import libtelnet
         libtelnet.write("localhost", self.tor_process.control_port, cmd)
@@ -245,7 +266,6 @@ class _Instance:
     def restart(self):
         self._stop()
         self.start()
-        self.wait_for_initialization()
 
 def _is_port_used(port : int) -> bool:
     import socket

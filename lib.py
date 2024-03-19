@@ -11,14 +11,12 @@ from pylibcommons import libprint, libkw, libserver
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(prefix = "+", logger = log.debug)
     instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
-    instance.start()
+    future = instance.start(timeout = kwargs['timeout'])
     if callback_before_wait:
         callback_before_wait(instance)
     if wait_for_initialization:
-        try:
-            if not instance.wait_for_initialization(timeout = kwargs['timeout']):
-                raise TimeoutError()
-        except private._TorProcess.Stopped:
+        output = future.result()
+        if output == InitializationState.STOPPED:
             log.info("Interrupted")
             instance.stop()
     libprint.print_func_info(prefix = "-", logger = log.debug)
@@ -45,48 +43,17 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
     check_ports(ports)
     instances = [private._make_tor_privoxy_none_block(*pt) for pt in ports]
     libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
-    for i in instances: i.start()
+    futures = []
+    for i in instances:
+        future = i.start()
+        futures.append(future)
     success_factor = 1
-    if "success_factor" in kwargs:
-        success_factor = kwargs["success_factor"]
     if callback_before_wait:
         for i in instances: callback_before_wait(i)
     libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
     if wait_for_initialization:
-        def callback_is_initialized():
-            libprint.print_func_info(prefix = "+", logger = log.debug, extra_string = f"{instances}")
-            with concurrent.ThreadPoolExecutor() as executor:
-                def is_initialized_async(i):
-                    is_init = i.tor_process.is_initialized()
-                    libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{i}.tor_process.is_initialized() = {is_init}")
-                    return is_init
-                libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
-                futures = [executor.submit(is_initialized_async, i) for i in instances]
-                is_initialized = [f.result() for f in futures]
-                true_count = len([1 for i in is_initialized if i is True])
-                factor = float(true_count) / float(len(is_initialized))
-                libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances} {factor} >= {success_factor}")
-                libprint.print_func_info(prefix = "-", logger = log.debug, extra_string = f"{instances}")
-                return factor >= success_factor
-        def callback_to_stop():
-            libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
-            return all([i.tor_process.was_stopped() for i in instances])
-        try:
-            timeout = libkw.handle_kwargs("timeout", default_output = 300, **kwargs)
-            libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"instances = {instances}, timeout = {timeout}")
-            if not private._TorProcess.wait_for_initialization(callback_is_initialized = callback_is_initialized, callback_to_stop = callback_to_stop, timeout = timeout):
-                libprint.print_func_info(prefix = "*", logger = log.error)
-                raise TimeoutError()
-            else:
-                for i in instances: i.tor_process.init_controller()
-        except private._TorProcess.Stopped:
-            for i in instances: i.stop()
-            log.info("Interrupted")
-        except Exception as ex:
-            log.error(f"{ex}")
-            import traceback
-            tb = traceback.format_exc()
-            log.error(tb)
+        results = [future.result() for f in futures]
+        libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"results for initialization {results}")
     server = _try_create_server(instances, **kwargs)
     libprint.print_func_info(prefix = "-", logger = log.debug)
     if server is None:
