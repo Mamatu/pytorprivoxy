@@ -8,6 +8,17 @@ log = logging.getLogger("pytorprivoxy")
 def handle_line(line, instances):
     return _handle_line(line, instances)
 
+def get_instances(args, callback):
+    is_all = [x for x in control_ports if x == "all"]
+    is_all = any(is_all)
+    output = []
+    for instance in instances:
+        is_this_port = [x for x in control_ports if x == callback(instance)]
+        is_this_port = any(is_this_port)
+        if is_all or is_this_port:
+            output.append(instance)
+    return output
+
 def _get_commands(instances):
     def convert(a):
         try:
@@ -36,13 +47,9 @@ def _get_commands(instances):
     def _newnym(instances, args):
         libprint.print_func_info(logger = log.info)
         control_ports = [convert(a) for a in args]
-        is_all = [x for x in control_ports if x == "all"]
-        is_all = any(is_all)
+        instances = get_instances(control_ports, lambda x: x.tor_process.control_port)
         for instance in instances:
-            is_this_port = [x for x in control_ports if x == instance.tor_process.control_port]
-            is_this_port = any(is_this_port)
-            if is_all or is_this_port:
-                instance.write_telnet_cmd_authenticate(f"SIGNAL NEWNYM")
+            instance.write_telnet_cmd_authenticate(f"SIGNAL NEWNYM")
     _commands["newnym"] = _newnym
     def _checkip(instances, args):
         libprint.print_func_info(logger = log.info)
@@ -51,27 +58,22 @@ def _get_commands(instances):
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
         privoxy_ports = [convert(a) for a in args]
-        is_all = [x for x in privoxy_ports if x == "all"]
-        is_all = any(is_all)
-        output = None
+        instances = get_instances(privoxy_ports, lambda x: x.privoxy_process.listen_port)
         for instance in instances:
-            is_this_port = [x for x in privoxy_ports if x == instance.privoxy_process.listen_port]
-            is_this_port = any(is_this_port)
-            if is_all or is_this_port:
-                command = f"curl -x \"http://localhost:{instance.privoxy_process.listen_port}\" http://httpbin.org/ip"
-                process = libprocess.Process(command, use_temp_file = True, shell = True)
-                libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"Run command {command}")
-                process.start()
-                process.wait()
-                libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"After command {command}")
-                if process.is_stdout():
-                    stdout = process.get_stdout()
-                    if output is None:
-                        output = ""
-                    output = output + "\n".join(stdout.readlines())
-                else:
-                    extra_string = f"checkip: no stdout"
-                    libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
+            command = f"curl -x \"http://localhost:{instance.privoxy_process.listen_port}\" http://httpbin.org/ip"
+            process = libprocess.Process(command, use_temp_file = True, shell = True)
+            libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"Run command {command}")
+            process.start()
+            process.wait()
+            libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"After command {command}")
+            if process.is_stdout():
+                stdout = process.get_stdout()
+                if output is None:
+                    output = ""
+                output = output + "\n".join(stdout.readlines())
+            else:
+                extra_string = f"checkip: no stdout"
+                libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
         return output
     _commands["checkip"] = _checkip
     def _restart(instances, args):
@@ -81,14 +83,9 @@ def _get_commands(instances):
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
         tor_ports = [convert(a) for a in args]
-        is_all = [x for x in tor_ports if x == "all"]
-        is_all = any(is_all)
-        output = None
+        instances = get_instances(tor_ports, lambda x: x.tor_process.socks_port)
         for instance in instances:
-            is_this_port = [x for x in tor_ports if x == instance.tor_process.socks_port]
-            is_this_port = any(is_this_port)
-            if is_all or is_this_port:
-                instance.restart()
+            instance.restart()
         return output
     _commands["restart"] = _restart
     return _commands
