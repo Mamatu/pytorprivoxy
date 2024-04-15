@@ -1,6 +1,8 @@
 import psutil
 import subprocess
+
 import tempfile
+import threading
 import time
 
 import logging
@@ -8,20 +10,20 @@ log = logging.getLogger("pytorprivoxy")
 
 from pylibcommons import libprint
 
+import concurrent.futures as concurrent
+
 class _Process:
     log = log.getChild(__name__)
-    def __init__(self, cmd):
+    def __init__(self):
         self.is_destroyed_flag = False
-        import threading
         self.lock = threading.Lock()
-        self.cmd = cmd
         self.process = None
     def was_stopped(self):
         return self.is_destroyed_flag
     def emit_warning_during_destroy(self, ex):
         log.warning(f"{ex}: please verify if process {self.cmd} was properly closed")
-    def start(self):
-        self.process = subprocess.Popen(self.cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
+    def start(self, cmd):
+        self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
         log.info(f"Start process {self.process}")
     def stop(self):
         self.is_destroyed_flag = True
@@ -65,15 +67,15 @@ class _TorProcess(_Process):
         self.wait_for_initialization = self._instance_wait_for_initialization
         self.was_initialized = False
         self.data_directory = tempfile.TemporaryDirectory()
-        self.config = self.__make_config(socks_port, control_port, listen_port, self.data_directory.name)
-        super().__init__(["tor", "-f", self.config.name])
+        self.config = None
         self.controller = None
         self.socks_port = socks_port
         self.control_port = control_port
         self.listen_port = listen_port
-        self.detroy_flag = False
+        self.stop_flag = False
         log.info(f"Instace of tor process: {self.id_ports()}")
         libprint.print_func_info(prefix = "-", logger = log.debug)
+        super().__init__()
     def is_initialized(self):
         libprint.print_func_info(prefix = "+", logger = log.debug)
         try:
@@ -125,16 +127,19 @@ class _TorProcess(_Process):
         It is accessible by self.wait_for_initialization
         """
         libprint.print_func_info(prefix = "+", logger = log.debug)
-        status =  _TorProcess.wait_for_initialization(lambda: self.is_initialized(), lambda: self.was_stopped(), timeout, delay)
+        status = _TorProcess.wait_for_initialization(lambda: self.is_initialized(), lambda: self.was_stopped(), timeout, delay)
         if status: self.init_controller()
         libprint.print_func_info(prefix = "-", logger = log.debug)
         return status
     def was_stopped(self):
-        return self.detroy_flag
+        return self.stop_flag
     def start(self):
-        super().start()
+        self.config = self.__make_config(self.socks_port, self.control_port, self.listen_port, self.data_directory.name)
+        super().start(["tor", "-f", self.config.name])
     def stop(self):
         self._stop()
+        self.stop_flag = False
+        self.was_initialized = False
     def get_url(self):
         return f"http://127.0.0.1:{self.listen_port}"
     def init_controller(self):
@@ -164,7 +169,7 @@ class _TorProcess(_Process):
             libprint.print_func_info(prefix = "-", logger = log.debug)
     def _stop(self):
         libprint.print_func_info(prefix = "+", logger = log.debug)
-        self.detroy_flag = True
+        self.stop_flag = True
         super().stop()
         if hasattr(self, "config"):
             self.config.close()
@@ -187,10 +192,13 @@ class _PrivoxyProcess(_Process):
         config.flush()
         return config
     def __init__(self, socks_port, listen_port):
-        self.config = self.__make_config(socks_port, listen_port)
+        self.config = None
         self.socks_port = socks_port
         self.listen_port = listen_port
-        super().__init__(["privoxy", "--no-daemon", self.config.name])
+        super().__init__()
+    def start(self):
+        self.config = self.__make_config(self.socks_port, self.listen_port)
+        super().start(["privoxy", "--no-daemon", self.config.name])
     def stop(self):
         super().stop()
         if hasattr(self, "config"):
@@ -198,24 +206,50 @@ class _PrivoxyProcess(_Process):
     def get_listen_port(self):
         return self.listen_port
 
+import enum
+class InitializationState(enum.Enum):
+    OK = 0,
+    TIMEOUT = 1,
+    STOPPED = 2
+
 class _Instance:
     log = log.getChild(__name__)
     def __init__(self, tor_process, privoxy_process):
+        self.usable = False
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
+        self.quit = False
+        self.cv = threading.Condition()
+        self._executor = None
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
-    def start(self):
+    def start(self, timeout = 60, delay = 0.5):
         self.tor_process.start()
         self.privoxy_process.start()
+        return self._run_initialization()
     def stop(self):
+        self._stop()
+        with self.cv:
+            self.quit = True
+            self.cv.notify()
+    def _stop(self):
+        self.usable = False
         self.tor_process.stop()
         self.privoxy_process.stop()
-    def wait_for_initialization(self, timeout = 60, delay = 0.5):
-        try:
-            return self.tor_process.wait_for_initialization(timeout, delay)
-        except _TorProcess.Stopped:
-            return False
+    def _run_initialization(self, timeout = 60, delay = 0.5):
+        def thread_func(self, timeout, delay):
+            try:
+                output = self.tor_process.wait_for_initialization(timeout, delay)
+                if output:
+                    self.usable = True
+                    return InitializationState.OK
+                else:
+                    return InitializationState.TIMEOUT
+            except InitializationState.STOPPED:
+                return False
+        if self._executor is None:
+            self._executor = concurrent.ThreadPoolExecutor()
+        return self._executor.submit(thread_func, self, timeout, delay)
     def write_telnet_cmd(self, cmd):
         from private import libtelnet
         libtelnet.write("localhost", self.tor_process.control_port, cmd)
@@ -226,10 +260,12 @@ class _Instance:
     def write_telnet_cmd_authenticate(self, cmd):
         self.write_telnet_cmd(["authenticate", cmd])
     def join(self):
-        self.privoxy_process.wait()
-        self.tor_process.wait()
+        with self.cv:
+            while not self.quit:
+                self.cv.wait()
     def restart(self):
-        self.tor_process.controller.signal(Signal.NEWNYM)
+        self._stop()
+        self.start()
 
 def _is_port_used(port : int) -> bool:
     import socket

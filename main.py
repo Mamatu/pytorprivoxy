@@ -54,6 +54,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
+    parser.add_argument("--start_from_file", help = "like start but read ports from file", type=str)
     parser.add_argument("--log_level", help = "logging debug: CRITICAL ERROR WARNING INFO DEBUG", type=str, default = "INFO")
     parser.add_argument("--stdout", help = "logging into stdout", action='store_true')
     parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
@@ -74,10 +75,9 @@ if __name__ == "__main__":
         from private import libpass
         libpass.load_password_from_file(args.password_from_file)
     try:
-        if args.start:
-            server = None
-            if all(isinstance(p, list) for p in args.start):
-                instances = start_multiple(args.start, **args_dict, server = args.server)
+        def start_from_args(ports, server, **args_dict):
+            if all(isinstance(p, list) for p in ports):
+                instances = start_multiple(ports, **args_dict, server = server)
                 server = None
                 print(instances)
                 if isinstance(instances, tuple):
@@ -86,10 +86,28 @@ if __name__ == "__main__":
                 for instance in instances:
                     instance.join()
             else:
-                instance = start(*args.start, **args_dict, server = args.server)
+                instance = start(*ports, server = server, **args_dict)
                 if isinstance(instances, tuple):
                     server = instances[1]
                     instances = instances[0]
                 instance.join()
+        server = None
+        if args.start:
+            start_from_args(args.start, args.server, **args_dict)
+        elif args.start_from_file:
+            ports_all = []
+            with open(args.start_from_file, "r") as f:
+                lines = f.readlines()
+            for line in lines:
+                import string
+                ports = line.split()
+                if len(ports) != 3:
+                    raise Exception(f"Line {line} contains invalid number of prots (it must be 3)")
+                try:
+                    ports = [int(p) for p in ports]
+                except ValueError:
+                    raise Exception(f"Element of {ports} cannot be converted into int")
+                ports_all.append(list(ports))
+            start_from_args(ports_all, args.server, **args_dict)
     except TimeoutError as te:
         log.error(f"Timeout expired: {te}")
