@@ -18,15 +18,13 @@ def _instances_remove(instance):
 
 def start(socks_port, control_port, listen_port, wait_for_initialization = True, **kwargs):
     global __instances
-    callback_before_wait = lambda instance: __instances_append(instance)
+    callback_before_wait = lambda instance: _instances_append(instance)
     return lib.start(socks_port, control_port, listen_port, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
-    return instance
 
 def start_multiple(ports : list, wait_for_initialization = True, **kwargs):
     global __instances
     callback_before_wait = lambda instance: _instances_append(instance)
     return lib.start_multiple(ports, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
-    return instances
 
 def stop(instance):
     lib.stop(instance)
@@ -50,7 +48,6 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 if __name__ == "__main__":
-    import os
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
@@ -99,7 +96,6 @@ if __name__ == "__main__":
             with open(args.start_from_file, "r") as f:
                 lines = f.readlines()
             for line in lines:
-                import string
                 ports = line.split()
                 if len(ports) != 3:
                     raise Exception(f"Line {line} contains invalid number of prots (it must be 3)")

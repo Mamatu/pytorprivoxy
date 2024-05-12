@@ -15,6 +15,6 @@ def write(address, port, cmds):
                 for c in cmds: write(f"{c}\n")
             else:
                 log.info(f"telnet {tn} write: {cmds}")
-                write(f"cmds\n")
+                write(f"{cmds}\n")
     finally:
         libprint.print_func_info(prefix = "-", logger = log.debug, extra_string = f"cmds: {cmds}")

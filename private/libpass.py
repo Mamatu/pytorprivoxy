@@ -29,8 +29,8 @@ def get_hashed_password(remove_prefix = False):
     print(_hashed_pass)
     return _hashed_pass
 
-def load_password_from_file(filepath):
-    with open(filepath, "r") as f:
-        _pass = f.read()
-        global _passowrd
-        _password = remove_whitespace(_pass)
+#def load_password_from_file(filepath):
+#    with open(filepath, "r") as f:
+#        _pass = f.read()
+#        global _passowrd
+#        _password = remove_whitespaces(_pass)

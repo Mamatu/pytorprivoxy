@@ -1,15 +1,13 @@
 from pylibcommons import libprint, libprocess
+
 import logging
-
-import os
-
 log = logging.getLogger("pytorprivoxy")
 
 def handle_line(line, instances):
     libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
     return _handle_line(line, instances)
 
-def get_instances(ports, callback):
+def get_instances(ports, instances, callback):
     is_all = [x for x in ports if x == "all"]
     is_all = any(is_all)
     output = []
@@ -39,7 +37,7 @@ def _get_commands(instances):
     def _read(instances, args):
         libprint.print_func_info(logger = log.info)
         if len(args) != 0:
-            extra_string = f"read: it requires no argument"
+            extra_string = "read: it requires no argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
         ports = [(i.tor_process.socks_port, i.tor_process.control_port, i.tor_process.listen_port) for i in instances]
@@ -48,18 +46,19 @@ def _get_commands(instances):
     def _newnym(instances, args):
         libprint.print_func_info(logger = log.info)
         control_ports = [convert(a) for a in args]
-        instances = get_instances(control_ports, lambda x: x.tor_process.control_port)
+        instances = get_instances(control_ports, instances, lambda x: x.tor_process.control_port)
         for instance in instances:
-            instance.write_telnet_cmd_authenticate(f"SIGNAL NEWNYM")
+            instance.write_telnet_cmd_authenticate("SIGNAL NEWNYM")
     _commands["newnym"] = _newnym
     def _checkip(instances, args):
         libprint.print_func_info(logger = log.info)
         if len(args) == 0:
-            extra_string = f"checkip: it requires at least a one argument"
+            extra_string = "checkip: it requires at least a one argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
         privoxy_ports = [convert(a) for a in args]
-        instances = get_instances(privoxy_ports, lambda x: x.privoxy_process.listen_port)
+        instances = get_instances(privoxy_ports, instances, lambda x: x.privoxy_process.listen_port)
+        output = None
         for instance in instances:
             command = f"curl -x \"http://localhost:{instance.privoxy_process.listen_port}\" http://httpbin.org/ip"
             process = libprocess.Process(command, use_temp_file = True, shell = True)
@@ -73,21 +72,20 @@ def _get_commands(instances):
                     output = ""
                 output = output + "\n".join(stdout.readlines())
             else:
-                extra_string = f"checkip: no stdout"
+                extra_string = "checkip: no stdout"
                 libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
         return output
     _commands["checkip"] = _checkip
     def _restart(instances, args):
         libprint.print_func_info(logger = log.info)
         if len(args) == 0:
-            extra_string = f"checkip: it requires at least a one argument"
+            extra_string = "checkip: it requires at least a one argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
             return
         tor_ports = [convert(a) for a in args]
-        instances = get_instances(tor_ports, lambda x: x.tor_process.socks_port)
+        instances = get_instances(tor_ports, instances, lambda x: x.tor_process.socks_port)
         for instance in instances:
             instance.restart()
-        return output
     _commands["restart"] = _restart
     return _commands
 
@@ -97,12 +95,9 @@ def _handle_line(line, instances):
     libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
     command = re.split('\s+', line)
     if len(command) == 0:
-        libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"line does not contain any command")
+        libprint.print_func_info(prefix = "*", logger = log.error, extra_string = "line does not contain any command")
         return
     handle_cmds = _get_commands(instances)
-    args = []
-    if len(command) > 1:
-        args = command[1:]
     if command[0] in handle_cmds.keys():
         libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"{command[0]} {command[1:]}")
         return handle_cmds[command[0]](instances, command[1:])

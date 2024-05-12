@@ -1,12 +1,11 @@
 from private import lib as private
 from private import libcmds
-import concurrent.futures as concurrent
-import logging
 import sys
+
+import logging
 log = logging.getLogger("pytorprivoxy")
 
-from private import libcmds
-from pylibcommons import libprint, libkw, libserver
+from pylibcommons import libprint, libkw
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(prefix = "+", logger = log.debug)
@@ -16,7 +15,7 @@ def start(socks_port : int, control_port : int, listen_port : int, callback_befo
         callback_before_wait(instance)
     if wait_for_initialization:
         output = future.result()
-        if output == InitializationState.STOPPED:
+        if output == private.InitializationState.STOPPED:
             log.info("Interrupted")
             instance.stop()
     libprint.print_func_info(prefix = "-", logger = log.debug)
@@ -47,7 +46,6 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
     for i in instances:
         future = i.start()
         futures.append(future)
-    success_factor = 1
     if callback_before_wait:
         for i in instances: callback_before_wait(i)
     libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
@@ -82,7 +80,7 @@ def get_url(instance):
 def set_logging_level(log_level):
     expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
     if not log_level in expected_levels.keys():
-        raise Exception(f'{args.log_level} is not supported. Should be {",".join(expected_levels.keys())}')
+        raise Exception(f'{log_level} is not supported. Should be {",".join(expected_levels.keys())}')
     else:
         loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
         for log in loggers:
@@ -115,10 +113,9 @@ def enable_stdout():
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]
-    success_facctor = 1.
     if "success_factor" in kwargs:
         success_factor = kwargs["success_factor"]
     ports_len = len(ports)
-    ports_len_to_run = ports * rpf
+    ports_len_to_run = ports_len * rpf
     run_ports = ports[:ports_len_to_run]
     start_multiple(run_ports, success_factor = success_factor)

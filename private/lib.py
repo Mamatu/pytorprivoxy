@@ -53,7 +53,6 @@ class _TorProcess(_Process):
         pass
     def __make_config(self, socks_port, control_port, listen_port, data_directory_path):
         libprint.print_func_info(prefix = "+", logger = log.debug)
-        from private import libpass
         config = tempfile.NamedTemporaryFile(mode = "w")
         config.write(f"SocksPort {socks_port}\n")
         config.write(f"ControlPort {control_port}\n")
@@ -186,9 +185,9 @@ class _PrivoxyProcess(_Process):
         config = tempfile.NamedTemporaryFile(mode = "w")
         config.write(f"forward-socks5t / 127.0.0.1:{socks_port} .\n")
         config.write(f"listen-address 127.0.0.1:{listen_port}\n")
-        config.write(f"keep-alive-timeout 600\n")
-        config.write(f"default-server-timeout 600\n")
-        config.write(f"socket-timeout 600\n")
+        config.write("keep-alive-timeout 600\n")
+        config.write("default-server-timeout 600\n")
+        config.write("socket-timeout 600\n")
         config.flush()
         return config
     def __init__(self, socks_port, listen_port):
@@ -269,7 +268,7 @@ class _Instance:
 
 def _is_port_used(port : int) -> bool:
     import socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
 def _make_tor_privoxy_none_block(socks_port, control_port, listen_port):
