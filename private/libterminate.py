@@ -1,9 +1,7 @@
-import psutil
 import subprocess
+import psutil
 
 def terminate_subprocess(process):
-    import subprocess
-    import psutil
     parent = psutil.Process(process.pid)
     children = parent.children(recursive=True)
     for child in children:
