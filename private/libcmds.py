@@ -9,12 +9,12 @@ def handle_line(line, instances):
     libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
     return _handle_line(line, instances)
 
-def get_instances(args, callback):
-    is_all = [x for x in control_ports if x == "all"]
+def get_instances(ports, callback):
+    is_all = [x for x in ports if x == "all"]
     is_all = any(is_all)
     output = []
     for instance in instances:
-        is_this_port = [x for x in control_ports if x == callback(instance)]
+        is_this_port = [x for x in ports if x == callback(instance)]
         is_this_port = any(is_this_port)
         if is_all or is_this_port:
             output.append(instance)
