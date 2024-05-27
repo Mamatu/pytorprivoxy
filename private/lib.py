@@ -36,12 +36,12 @@ class _Process:
         try:
             from private import libterminate
             libterminate.terminate_subprocess(self.process)
+            log.info(f"Stop process {self.process}")
             self.process = None
         except psutil.NoSuchProcess as nsp:
             self.emit_warning_during_destroy(nsp)
         except subprocess.TimeoutExpired as te:
             self.emit_warning_during_destroy(te)
-        log.info(f"Stop process {self.process}")
     def wait(self):
         if self.process:
             self.process.wait()
