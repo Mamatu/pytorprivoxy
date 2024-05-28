@@ -12,6 +12,9 @@ from pylibcommons import libprint
 
 import concurrent.futures as concurrent
 
+from stem import Signal
+from private import libcontroller
+
 class _Process:
     log = log.getChild(__name__)
     def __init__(self):
@@ -144,9 +147,7 @@ class _TorProcess(_Process):
     def init_controller(self):
         try:
             libprint.print_func_info(prefix = "+", logger = log.debug)
-            from stem import Signal
-            from stem.control import Controller
-            self.controller = Controller.from_port(port = self.control_port)
+            self.controller = libcontroller.create(self.control_port)
             from private import libpass
             #self.controller.authenticate()
             self.controller.authenticate(password = libpass.get_password())
@@ -154,12 +155,15 @@ class _TorProcess(_Process):
             #self.controller.authenticate(libpass.get_hashed_password(remove_prefix = True))
             self.controller.signal(Signal.NEWNYM)
             def event_listener(event, d, events):
-                log.info(f"event: {event}")
+                extra_string = f"event: {event}"
+                libprint.print_func_info(logger = log.debug, extra_string = extra_string)
             self.controller.add_event_listener(event_listener)
             def status_listener(controller, state, number):
-                log.info(f"status: {controller} {state} {number}")
+                extra_string = f"status: {controller} {state} {number}"
+                libprint.print_func_info(logger = log.debug, extra_string = extra_string)
             self.controller.add_status_listener(status_listener)
-            log.info(f"Init controller {self.controller}")
+            extra_string = f"Init controller {self.controller}"
+            libprint.print_func_info(logger = log.debug, extra_string = extra_string)
         except Exception as ex:
             log.error(f"Exception: {ex} . Stopping of process")
             self._stop()
