@@ -154,14 +154,14 @@ class _TorProcess(_Process):
             #self.controller.authenticate(libpass.get_hashed_password())
             #self.controller.authenticate(libpass.get_hashed_password(remove_prefix = True))
             self.controller.signal(Signal.NEWNYM)
-            def event_listener(event, d, events):
-                extra_string = f"event: {event}"
+            def event_listener(event, d, events, user_data):
+                extra_string = f"{user_data} event: {event}"
                 libprint.print_func_info(logger = log.debug, extra_string = extra_string)
-            self.controller.add_event_listener(event_listener)
-            def status_listener(controller, state, number):
-                extra_string = f"status: {controller} {state} {number}"
+            self.controller.add_event_listener(event_listener, user_data = self.id_ports())
+            def status_listener(controller, state, number, user_data):
+                extra_string = f"{user_data} status: {controller} {state} {number}"
                 libprint.print_func_info(logger = log.debug, extra_string = extra_string)
-            self.controller.add_status_listener(status_listener)
+            self.controller.add_status_listener(status_listener, user_data = self.id_ports())
             extra_string = f"Init controller {self.controller}"
             libprint.print_func_info(logger = log.debug, extra_string = extra_string)
         except Exception as ex:

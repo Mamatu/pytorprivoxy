@@ -8,14 +8,27 @@ from pylibcommons import libprint
 class _Controller:
     def __init__(self, port):
         self.controller = Controller.from_port(port = port)
-    def add_event_listener(self, event_listener):
+        self.user_data = {}
+    def add_event_listener(self, event_listener, user_data = None):
         extra_string = f"event_listener = {event_listener}"
         libprint.print_func_info(logger = log.debug, extra_string = extra_string)
-        self.controller.add_event_listener(event_listener)
-    def add_status_listener(self, status_listener):
+        self.user_data["event_listener"] = user_data
+        def _callback(*args, **kwargs):
+            nonlocal user_data
+            if user_data is not None:
+                return event_listener(*args, **kwargs, user_data = user_data)
+            return event_listener(*args, **kwargs)
+        self.controller.add_event_listener(_callback)
+    def add_status_listener(self, status_listener, user_data = None):
         extra_string = f"status_listener = {status_listener}"
         libprint.print_func_info(logger = log.debug, extra_string = extra_string)
-        self.controller.add_status_listener(status_listener)
+        self.user_data["status_listener"] = user_data
+        def _callback(*args, **kwargs):
+            nonlocal user_data
+            if user_data is not None:
+                return status_listener(*args, **kwargs, user_data = user_data)
+            return status_listener(*args, **kwargs)
+        self.controller.add_status_listener(_callback)
     def authenticate(self, password):
         libprint.print_func_info(logger = log.debug)
         self.controller.authenticate(password = password)
