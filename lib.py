@@ -60,7 +60,8 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
 
 def stop(instance):
     if isinstance(instance, list):
-        for i in instance: i.stop()
+        for i in instance:
+            i.stop()
     else:
         stop([instance])
 

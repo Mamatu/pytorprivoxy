@@ -34,8 +34,9 @@ class _Process:
             return
         if self.process is None:
             return
-        self.process.stdout.close()
-        self.process.stderr.close()
+        with self.lock:
+            self.process.stdout.close()
+            self.process.stderr.close()
         try:
             from private import libterminate
             libterminate.terminate_subprocess(self.process)
@@ -45,6 +46,12 @@ class _Process:
             self.emit_warning_during_destroy(nsp)
         except subprocess.TimeoutExpired as te:
             self.emit_warning_during_destroy(te)
+    def callback_safe(self, callback):
+        try:
+            with self.lock:
+                return callback()
+        except Exception as ex:
+            raise ex
     def wait(self):
         if self.process:
             self.process.wait()
@@ -84,21 +91,22 @@ class _TorProcess(_Process):
             if self.was_initialized:
                 return True
             is_initialized_str = "Bootstrapped 100% (done): Done"
-            line = self.process.stdout.readline()
-            line = line.replace("\n", "")
-            log.info(f"{self.id_ports()} {line}")
-            if "[err]" in line:
-                raise _TorProcess.LineError(str(line))
-            if is_initialized_str in line:
-                log.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
-                self.was_initialized = True
-                return True
-            return False
+            def run_safe():
+                nonlocal self
+                line = self.process.stdout.readline()
+                line = line.replace("\n", "")
+                log.info(f"{self.id_ports()} {line}")
+                if "[err]" in line:
+                    raise _TorProcess.LineError(str(line))
+                if is_initialized_str in line:
+                    log.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
+                    self.was_initialized = True
+                    return True
+                return False
+            return self.callback_safe(run_safe)
         except Exception as ex:
             log.error(f"{self.id_ports()} {ex}")
-            if isinstance(ex, _TorProcess.LineError):
-                raise ex
-            return False
+            raise ex
         finally:
             libprint.print_func_info(prefix = "-", logger = log.debug)
     @staticmethod
@@ -114,9 +122,10 @@ class _TorProcess(_Process):
                         return True
                 except Exception as ex:
                     log.error(str(ex))
-                    import traceback
-                    tb = traceback.format_exc()
-                    log.error(tb)
+                    if isinstance(ex, _TorProcess.LineError):
+                        import traceback
+                        tb = traceback.format_exc()
+                        log.error(tb)
                     raise _TorProcess.Stopped()
                 time.sleep(delay)
                 duration = duration + delay
@@ -140,7 +149,7 @@ class _TorProcess(_Process):
         super().start(["tor", "-f", self.config.name])
     def stop(self):
         self._stop()
-        self.stop_flag = False
+        self.stop_flag = True
         self.was_initialized = False
     def get_url(self):
         return f"http://127.0.0.1:{self.listen_port}"
@@ -248,7 +257,7 @@ class _Instance:
                     return InitializationState.OK
                 else:
                     return InitializationState.TIMEOUT
-            except InitializationState.STOPPED:
+            except _TorProcess.Stopped:
                 return False
         if self._executor is None:
             self._executor = concurrent.ThreadPoolExecutor()

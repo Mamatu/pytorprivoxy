@@ -26,13 +26,16 @@ def start_multiple(ports : list, wait_for_initialization = True, **kwargs):
     callback_before_wait = lambda instance: _instances_append(instance)
     return lib.start_multiple(ports, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
 
-def stop(instance):
+def stop(instance, remove_instance = True):
     lib.stop(instance)
-    _instances_remove(instance)
+    if remove_instance:
+        _instances_remove(instance)
 
 def stop_all():
     global __instances
-    for i in __instances: stop(i)
+    for i in __instances:
+        stop(i, remove_instance = False)
+    __instances = []
 
 import atexit
 atexit.register(stop_all)
@@ -57,12 +60,21 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
     parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
     parser.add_argument("--server", help = "Establish server to multiprocess communication. As argument it takes listen port", type=int, default=None)
+    parser.add_argument("--find", help = "Path to directory when should be found epoal", type=str, default=None)
     factor_description = """
     Factor of success of initialization after what the app will be continued, otherwise it will interrupted.
     When is only one --start then it is ignored.
     """
     parser.add_argument("--success_factor", help = factor_description, type=float, default=1)
     args = parser.parse_args()
+    if args.find:
+        import os
+        import sys
+        for root, dirs, files in os.walk(args.find):
+            for file in files:
+                if file.endswith(".epoal"):
+                    print(os.path.join(root, file))
+        sys.exit(0)
     if args.log_level:
         lib.set_logging_level(args.log_level)
     if args.stdout:
@@ -76,7 +88,6 @@ if __name__ == "__main__":
             if all(isinstance(p, list) for p in ports):
                 instances = start_multiple(ports, **args_dict, server = server)
                 server = None
-                print(instances)
                 if isinstance(instances, tuple):
                     server = instances[1]
                     instances = instances[0]
