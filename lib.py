@@ -50,7 +50,7 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
         for i in instances: callback_before_wait(i)
     libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
     if wait_for_initialization:
-        results = [future.result() for f in futures]
+        results = [f.result() for f in futures]
         libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"results for initialization {results}")
     server = _try_create_server(instances, **kwargs)
     libprint.print_func_info(prefix = "-", logger = log.debug)
@@ -60,7 +60,8 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
 
 def stop(instance):
     if isinstance(instance, list):
-        for i in instance: i.stop()
+        for i in instance:
+            i.stop()
     else:
         stop([instance])
 
