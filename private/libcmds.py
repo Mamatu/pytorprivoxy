@@ -77,15 +77,21 @@ def _get_commands(instances):
         return output
     _commands["checkip"] = _checkip
     def _restart(instances, args):
-        libprint.print_func_info(logger = log.info)
-        if len(args) == 0:
-            extra_string = "checkip: it requires at least a one argument"
-            libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
-            return
-        tor_ports = [convert(a) for a in args]
-        instances = get_instances(tor_ports, instances, lambda x: x.tor_process.socks_port)
-        for instance in instances:
-            instance.restart()
+        def __restart(instances, args):
+            libprint.print_func_info(logger = log.info)
+            if len(args) == 0:
+                extra_string = "checkip: it requires at least a one argument"
+                libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
+                return
+            tor_ports = [convert(a) for a in args]
+            instances = get_instances(tor_ports, instances, lambda x: x.tor_process.socks_port)
+            for instance in instances:
+                instance.restart()
+        try:
+            return __restart(instances, args)
+        except Exception as ex:
+            libprint.print_func_info(logger = log.error, extra_string = f"{ex}")
+            raise ex
     _commands["restart"] = _restart
     return _commands
 
