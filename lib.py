@@ -92,6 +92,7 @@ def _try_create_server(instances, **kwargs):
     if server_port is not None:
         from pylibcommons import libserver
         def handler(line, client):
+            nonlocal instances
             try:
                 libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"line {line}")
                 output = libcmds.handle_line(line, instances)
