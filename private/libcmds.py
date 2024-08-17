@@ -93,7 +93,7 @@ def _handle_line(line, instances):
     import re
     line = line.rstrip()
     libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
-    command = re.split('\s+', line)
+    command = re.split('\\s+', line)
     if len(command) == 0:
         libprint.print_func_info(prefix = "*", logger = log.error, extra_string = "line does not contain any command")
         return
