@@ -7,6 +7,8 @@ signal(SIGPIPE, SIG_DFL)
 import logging
 log = logging.getLogger("pytorprivoxy")
 
+from pylibcommons import libkw, libthread
+
 def _instances_append(instance):
     global __instances
     __instances.append(instance)
@@ -50,7 +52,7 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
-if __name__ == "__main__":
+def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
@@ -60,29 +62,31 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
     parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
     parser.add_argument("--server", help = "Establish server to multiprocess communication. As argument it takes listen port", type=int, default=None)
-    parser.add_argument("--find", help = "Path to directory when should be found epoal", type=str, default=None)
     factor_description = """
     Factor of success of initialization after what the app will be continued, otherwise it will interrupted.
     When is only one --start then it is ignored.
     """
     parser.add_argument("--success_factor", help = factor_description, type=float, default=1)
     args = parser.parse_args()
-    if args.find:
-        import os
-        import sys
-        for root, dirs, files in os.walk(args.find):
-            for file in files:
-                if file.endswith(".epoal"):
-                    print(os.path.join(root, file))
-        sys.exit(0)
-    if args.log_level:
-        lib.set_logging_level(args.log_level)
-    if args.stdout:
+    start_main(**vars(args))
+
+def start_main(**kwargs):
+    arg_log_level = libkw.handle_kwargs("log_level", default_output = "INFO", **kwargs)
+    arg_stdout = libkw.handle_kwargs("stdout", default_output = False, **kwargs)
+    arg_password_from_file = libkw.handle_kwargs("password_from_file", default_output = None, **kwargs)
+    arg_start = libkw.handle_kwargs("start", default_output = None, **kwargs)
+    arg_start_from_file = libkw.handle_kwargs("start_from_file", default_output = None, **kwargs)
+    arg_server = libkw.handle_kwargs("server", default_output = None, **kwargs)
+    arg_timeout = libkw.handle_kwargs("timeout", default_output = 300, **kwargs)
+    arg_success_factor = libkw.handle_kwargs("success_factor", default_output = 1., **kwargs)
+    if arg_log_level:
+        lib.set_logging_level(arg_log_level)
+    if arg_stdout:
         lib.enable_stdout()
-    args_dict = {"timeout" : args.timeout, "success_factor" : args.success_factor}
-    if args.password_from_file:
+    args_dict = {"timeout" : arg_timeout, "success_factor" : arg_success_factor}
+    if arg_password_from_file:
         from private import libpass
-        libpass.load_password_from_file(args.password_from_file)
+        libpass.load_password_from_file(arg_password_from_file)
     try:
         def start_from_args(ports, server, **args_dict):
             if all(isinstance(p, list) for p in ports):
@@ -94,17 +98,17 @@ if __name__ == "__main__":
                 for instance in instances:
                     instance.join()
             else:
-                instance = start(*ports, server = server, **args_dict)
-                if isinstance(instances, tuple):
-                    server = instances[1]
-                    instances = instances[0]
+                instance = start(*ports, server = arg_server, **args_dict)
+                if isinstance(instance, tuple):
+                    server = instance[1]
+                    instance = instance[0]
                 instance.join()
         server = None
-        if args.start:
-            start_from_args(args.start, args.server, **args_dict)
-        elif args.start_from_file:
+        if arg_start:
+            start_from_args(arg_start, server, **args_dict)
+        elif arg_start_from_file:
             ports_all = []
-            with open(args.start_from_file, "r") as f:
+            with open(arg_start_from_file, "r") as f:
                 lines = f.readlines()
             for line in lines:
                 ports = line.split()
@@ -115,6 +119,17 @@ if __name__ == "__main__":
                 except ValueError:
                     raise Exception(f"Element of {ports} cannot be converted into int")
                 ports_all.append(list(ports))
-            start_from_args(ports_all, args.server, **args_dict)
+            start_from_args(ports_all, arg_server, **args_dict)
     except TimeoutError as te:
         log.error(f"Timeout expired: {te}")
+
+def start_main_async(**kwargs):
+    def target(stop_control, **kwargs):
+        start_main(**kwargs)
+    thread = libthread.Thread(target = target, kwargs = kwargs)
+    thread.start()
+    
+    return thread.get_stop_control()
+
+if __name__ == "__main__":
+    main()

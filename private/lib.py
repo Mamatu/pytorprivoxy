@@ -21,6 +21,7 @@ class _Process:
         self.is_destroyed_flag = False
         self.lock = threading.Lock()
         self.process = None
+        self.cmd = ""
     def was_stopped(self):
         return self.is_destroyed_flag
     def emit_warning_during_destroy(self, ex):
