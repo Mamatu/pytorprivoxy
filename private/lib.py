@@ -9,6 +9,7 @@ import logging
 log = logging.getLogger("pytorprivoxy")
 
 from pylibcommons import libprint
+from pylibcommons import libprocess
 
 import concurrent.futures as concurrent
 
@@ -194,7 +195,7 @@ class _TorProcess(_Process):
     def get_info(self, parameter):
         return self.controller.get_info(parameter)
 
-class _PrivoxyProcess(_Process):
+class _PrivoxyProcess(libprocess.Process):
     def __make_config(self, socks_port, listen_port):
         config = tempfile.NamedTemporaryFile(mode = "w")
         config.write(f"forward-socks5t / 127.0.0.1:{socks_port} .\n")
@@ -203,19 +204,28 @@ class _PrivoxyProcess(_Process):
         config.write("default-server-timeout 600\n")
         config.write("socket-timeout 600\n")
         config.flush()
+        import os
+        os.chmod(config.name, 0o777)
         return config
     def __init__(self, socks_port, listen_port):
         self.config = None
         self.socks_port = socks_port
         self.listen_port = listen_port
-        super().__init__()
-    def start(self):
+        libprint.print_func_info(prefix = "+", logger = log.info)
         self.config = self.__make_config(self.socks_port, self.listen_port)
-        super().start(["privoxy", "--no-daemon", self.config.name])
+        cmd = f"privoxy --no-daemon {self.config.name}"
+        libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"privoxy cmd: {cmd}")
+        super().__init__(cmd = cmd)
+    def start(self):
+        super().start()
     def stop(self):
+        libprint.print_func_info(prefix = "+", logger = log.info)
         super().stop()
         if hasattr(self, "config"):
             self.config.close()
+    def wait(self, **kwargs):
+        libprint.print_func_info(prefix = "+", logger = log.info)
+        super().wait(exception_on_error = True, print_stdout = True, print_stderr = True)
     def get_listen_port(self):
         return self.listen_port
 
@@ -228,7 +238,7 @@ class InitializationState(enum.Enum):
 class _Instance:
     log = log.getChild(__name__)
     def __init__(self, tor_process, privoxy_process):
-        self.usable = False
+        self.ready = False
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
         self.quit = False
@@ -237,8 +247,9 @@ class _Instance:
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
     def start(self, timeout = 60, delay = 0.5):
-        self.tor_process.start()
         self.privoxy_process.start()
+        self.privoxy_process.wait(exception_on_error = True, print_stdout = True, print_stderr = True)
+        self.tor_process.start()
         return self._run_initialization()
     def stop(self):
         self._stop()
@@ -246,7 +257,7 @@ class _Instance:
             self.quit = True
             self.cv.notify()
     def _stop(self):
-        self.usable = False
+        self.ready = False
         self.tor_process.stop()
         self.privoxy_process.stop()
     def _run_initialization(self, timeout = 60, delay = 0.5):
@@ -254,7 +265,7 @@ class _Instance:
             try:
                 output = self.tor_process.wait_for_initialization(timeout, delay)
                 if output:
-                    self.usable = True
+                    self.ready = True
                     return InitializationState.OK
                 else:
                     return InitializationState.TIMEOUT
@@ -279,6 +290,8 @@ class _Instance:
     def restart(self):
         self._stop()
         self.start()
+    def is_ready(self):
+        return self.ready
 
 def _is_port_used(port : int) -> bool:
     import socket

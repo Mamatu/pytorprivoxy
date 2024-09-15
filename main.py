@@ -33,6 +33,14 @@ def stop(instance, remove_instance = True):
     if remove_instance:
         _instances_remove(instance)
 
+def get_count_of_instances():
+    global __instances
+    return len(__instances)
+
+def get_instance(index):
+    global __instances
+    return __instances[index]
+
 def stop_all():
     global __instances
     for i in __instances:
@@ -122,14 +130,23 @@ def start_main(**kwargs):
             start_from_args(ports_all, arg_server, **args_dict)
     except TimeoutError as te:
         log.error(f"Timeout expired: {te}")
+    except Exception as e:
+        log.error(f"Exception: {e}")
+        raise e
 
 def start_main_async(**kwargs):
+    arg_log_level = libkw.handle_kwargs("log_level", default_output = "INFO", **kwargs)
+    if arg_log_level:
+        lib.set_logging_level(arg_log_level)
     def target(stop_control, **kwargs):
         start_main(**kwargs)
     thread = libthread.Thread(target = target, kwargs = kwargs)
     thread.start()
-    
-    return thread.get_stop_control()
+    return thread, thread.get_stop_control()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import sys
+        sys.exit(1)

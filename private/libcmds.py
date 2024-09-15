@@ -64,7 +64,7 @@ def _get_commands(instances):
             process = libprocess.Process(command, use_temp_file = True, shell = True)
             libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"Run command {command}")
             process.start()
-            process.wait()
+            process.wait(exception_on_error = True, print_stdout = True, print_stderr = True)
             libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"After command {command}")
             if process.is_stdout():
                 stdout = process.get_stdout()

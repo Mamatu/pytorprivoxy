@@ -101,6 +101,7 @@ def _try_create_server(instances, **kwargs):
                 return output
             except Exception as ex:
                 libprint.print_func_info(extra_string = f"{ex}", logger = log.error)
+                client.send(str(ex))
         address = ("localhost", server_port)
         libprint.print_func_info(prefix = "+", logger = log.debug)
         server = libserver.run(handler, address)
