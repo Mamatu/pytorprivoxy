@@ -248,7 +248,7 @@ class _Instance:
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
     def start(self, timeout = 60, delay = 0.5):
         self.privoxy_process.start()
-        self.privoxy_process.wait(exception_on_error = True, print_stdout = True, print_stderr = True)
+        #self.privoxy_process.wait(exception_on_error = True, print_stdout = True, print_stderr = True)
         self.tor_process.start()
         return self._run_initialization()
     def stop(self):
