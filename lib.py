@@ -105,7 +105,7 @@ def _try_create_server(instances, **kwargs):
         address = ("localhost", server_port)
         libprint.print_func_info(prefix = "+", logger = log.debug)
         server = libserver.run(handler, address)
-        libprint.print_func_info(extra_string = f"Multiprocess server {server} run on {address}", logger = log.info)
+        libprint.print_func_info(prefix = "-", extra_string = f"Multiprocess server {server} run on {address}", logger = log.info)
         return server
     return None
 

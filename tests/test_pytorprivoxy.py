@@ -54,7 +54,7 @@ def _get_ip_address(data):
     except Exception as e:
         return None
 
-def test_get_ip():
+def test_checkip():
     server_port = 9003
     start_time = time.time()
     import logging
@@ -77,12 +77,13 @@ def test_get_ip():
     end_time = time.time()
     assert (end_time - start_time) <= 30
 
-def test_reset_ip():
+def test_newnym():
     server_port = 9003
     start_time = time.time()
     import logging
     log = logging.getLogger("pytorprivoxy")
-    thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), server = server_port, stdout = True)
+    main_async_kwargs = {"log_level": "DEBUG", "start": (9000, 9001, 9002), "server": server_port, "stdout": True}
+    thread, stop_control = main.start_main_async(**main_async_kwargs)
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
     instance = main.get_instance(0)
     while_with_timeout(25, lambda: not instance.is_ready(), timeout_msg = "Not ready")
@@ -93,7 +94,8 @@ def test_reset_ip():
         data = client.recv()
         ipaddress1 = _get_ip_address(data)
         client.send("newnym 9001")
-        #data = client.recv()
+        data = client.recv()
+        time.sleep(10)
         client.send("checkip 9002")
         data = client.recv()
         ipaddress2 = _get_ip_address(data)
@@ -103,4 +105,4 @@ def test_reset_ip():
         thread.join()
         end_time = time.time()
         assert ipaddress1 != ipaddress2
-        assert (end_time - start_time) <= 35
+        assert (end_time - start_time) <= 60

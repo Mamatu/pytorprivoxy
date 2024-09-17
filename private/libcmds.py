@@ -3,6 +3,9 @@ from pylibcommons import libprint, libprocess
 import logging
 log = logging.getLogger("pytorprivoxy")
 
+import time
+import json
+
 def handle_line(line, instances):
     libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
     return _handle_line(line, instances)
@@ -49,6 +52,8 @@ def _get_commands(instances):
         instances = get_instances(control_ports, instances, lambda x: x.tor_process.control_port)
         for instance in instances:
             instance.write_telnet_cmd_authenticate("SIGNAL NEWNYM")
+        time.sleep(8)
+        return json.dumps({"status" : "ok"})
     _commands["newnym"] = _newnym
     def _checkip(instances, args):
         libprint.print_func_info(logger = log.info)
