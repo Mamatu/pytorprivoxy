@@ -7,7 +7,7 @@ signal(SIGPIPE, SIG_DFL)
 import logging
 log = logging.getLogger("pytorprivoxy")
 
-from pylibcommons import libkw, libthread
+from pylibcommons import libkw, libthread, libprint
 
 def _instances_append(instance):
     global __instances
@@ -106,14 +106,14 @@ def start_main(**kwargs):
                 for instance in instances:
                     instance.join()
             else:
-                instance = start(*ports, server = arg_server, **args_dict)
+                instance = start(*ports, server = server, **args_dict)
                 if isinstance(instance, tuple):
                     server = instance[1]
                     instance = instance[0]
                 instance.join()
         server = None
         if arg_start:
-            start_from_args(arg_start, server, **args_dict)
+            start_from_args(arg_start, arg_server, **args_dict)
         elif arg_start_from_file:
             ports_all = []
             with open(arg_start_from_file, "r") as f:
