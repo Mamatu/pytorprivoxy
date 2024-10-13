@@ -2,6 +2,7 @@ import main
 import time
 
 from pylibcommons import libprint
+from private.lib import is_port_open
 
 def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
     start_time = time.time()
@@ -17,6 +18,9 @@ def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1)
         raise Exception(timeout_msg)
 
 def test_interrupt_initialization():
+    assert is_port_open(9000)
+    assert is_port_open(9001)
+    assert is_port_open(9002)
     start_time = time.time()
     import logging
     log = logging.getLogger("pytorprivoxy")
@@ -29,6 +33,10 @@ def test_interrupt_initialization():
     assert (end_time - start_time) <= 17
 
 def test_initialize():
+    assert is_port_open(9000)
+    assert is_port_open(9001)
+    assert is_port_open(9002)
+    assert is_port_open(9003)
     start_time = time.time()
     import logging
     log = logging.getLogger("pytorprivoxy")
@@ -55,6 +63,11 @@ def _get_ip_address(data):
         return None
 
 def test_checkip():
+    assert is_port_open(9000)
+    assert is_port_open(9001)
+    assert is_port_open(9002)
+    assert is_port_open(9003)
+    start_time = time.time()
     server_port = 9003
     start_time = time.time()
     import logging
@@ -78,6 +91,11 @@ def test_checkip():
     assert (end_time - start_time) <= 65
 
 def test_newnym():
+    assert is_port_open(9000)
+    assert is_port_open(9001)
+    assert is_port_open(9002)
+    assert is_port_open(9003)
+    start_time = time.time()
     server_port = 9003
     start_time = time.time()
     import logging
@@ -114,6 +132,14 @@ def test_newnym():
         client_operation()
 
 def test_newnym_2_instances():
+    assert is_port_open(9000)
+    assert is_port_open(9001)
+    assert is_port_open(9002)
+    assert is_port_open(9003)
+    assert is_port_open(9004)
+    assert is_port_open(9005)
+    assert is_port_open(9006)
+    start_time = time.time()
     server_port = 9006
     start_time = time.time()
     import logging

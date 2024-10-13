@@ -248,7 +248,6 @@ class _Instance:
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
     def start(self, timeout = 60, delay = 0.5):
         self.privoxy_process.start()
-        #self.privoxy_process.wait(exception_on_error = True, print_stdout = True, print_stderr = True)
         self.tor_process.start()
         return self._run_initialization()
     def stop(self):
@@ -297,6 +296,9 @@ def _is_port_used(port : int) -> bool:
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
+
+def is_port_open(port : int) -> bool:
+    return not _is_port_used(port)
 
 def _make_tor_privoxy_none_block(socks_port, control_port, listen_port):
     libprint.print_func_info(prefix = "+", logger = log.debug)
