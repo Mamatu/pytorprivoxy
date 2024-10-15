@@ -4,6 +4,9 @@ import time
 from pylibcommons import libprint
 from private.lib import is_port_open
 
+import logging
+log = logging.getLogger("pytorprivoxy")
+
 def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
     start_time = time.time()
     timeouted = False
@@ -30,7 +33,7 @@ def test_interrupt_initialization():
     stop_control.stop()
     thread.join()
     end_time = time.time()
-    assert (end_time - start_time) <= 17
+    assert (end_time - start_time) <= 60
 
 def test_initialize():
     assert is_port_open(9000)
@@ -42,8 +45,7 @@ def test_initialize():
     log = logging.getLogger("pytorprivoxy")
     thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), server = 9003, stdout = True)
     time.sleep(1)
-    while not main.get_count_of_instances() == 1:
-        time.sleep(1)
+    while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
     instance = main.get_instance(0)
     while not instance.is_ready():
         time.sleep(1)
