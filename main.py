@@ -111,6 +111,8 @@ def start_main(**kwargs):
                     server = instance[1]
                     instance = instance[0]
                 instance.join()
+            if server:
+                server.stop()
         server = None
         if arg_start:
             start_from_args(arg_start, arg_server, **args_dict)
@@ -138,8 +140,10 @@ def start_main_async(**kwargs):
     arg_log_level = libkw.handle_kwargs("log_level", default_output = "INFO", **kwargs)
     if arg_log_level:
         lib.set_logging_level(arg_log_level)
-    def target(stop_control, **kwargs):
-        start_main(**kwargs)
+    if arg_log_level:
+        lib.set_logging_level(arg_log_level)
+    def target(stop_control, **_kwargs):
+        start_main(**_kwargs)
     thread = libthread.Thread(target = target, kwargs = kwargs)
     thread.start()
     return thread, thread.get_stop_control()

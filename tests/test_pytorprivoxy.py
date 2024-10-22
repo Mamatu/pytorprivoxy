@@ -5,7 +5,7 @@ from pylibcommons import libprint
 from private.lib import is_port_open
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+glog = logging.getLogger("pytorprivoxy")
 
 def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
     start_time = time.time()
@@ -21,6 +21,7 @@ def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1)
         raise Exception(timeout_msg)
 
 def test_interrupt_initialization():
+    global glog
     assert is_port_open(9000)
     assert is_port_open(9001)
     assert is_port_open(9002)
@@ -34,8 +35,10 @@ def test_interrupt_initialization():
     thread.join()
     end_time = time.time()
     assert (end_time - start_time) <= 60
+    time.sleep(5)
 
 def test_initialize():
+    global glog
     assert is_port_open(9000)
     assert is_port_open(9001)
     assert is_port_open(9002)
@@ -54,6 +57,7 @@ def test_initialize():
     thread.join()
     end_time = time.time()
     assert (end_time - start_time) <= 60
+    time.sleep(5)
 
 def _get_ip_address(data):
     try:
@@ -91,6 +95,7 @@ def test_checkip():
     thread.join()
     end_time = time.time()
     assert (end_time - start_time) <= 65
+    time.sleep(5)
 
 def test_newnym():
     assert is_port_open(9000)
@@ -132,6 +137,7 @@ def test_newnym():
         client_operation()
     except Exception:
         client_operation()
+    time.sleep(5)
 
 def test_newnym_2_instances():
     assert is_port_open(9000)
@@ -171,3 +177,4 @@ def test_newnym_2_instances():
         end_time = time.time()
         assert ipaddress1 != ipaddress2
         assert (end_time - start_time) <= 70
+    time.sleep(5)
