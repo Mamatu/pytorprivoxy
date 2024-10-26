@@ -286,19 +286,40 @@ class _Instance:
         with self.cv:
             while not self.quit:
                 self.cv.wait()
+        self._stop()
     def restart(self):
         self._stop()
         self.start()
     def is_ready(self):
         return self.ready
 
+def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
+    start_time = time.time()
+    timeouted = False
+    while condition():
+        if time.time() - start_time >= timeout:
+            timeouted = True
+            break
+        time.sleep(time_sleep)
+    if timeouted:
+        if timeout_msg is None:
+            timeout_msg = "Timeout in while"
+        raise Exception(timeout_msg)
+
 def _is_port_used(port : int) -> bool:
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
+def _while_port_used(port : int) -> bool:
+    try:
+        while_with_timeout(5, lambda: _is_port_used(port))
+    except Exception:
+        return True
+    return False
+
 def is_port_open(port : int) -> bool:
-    return not _is_port_used(port)
+    return not _while_port_used(port)
 
 def _make_tor_privoxy_none_block(socks_port, control_port, listen_port):
     libprint.print_func_info(prefix = "+", logger = log.debug)
