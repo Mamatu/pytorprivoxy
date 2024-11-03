@@ -3,26 +3,28 @@ from private import libcmds
 import sys
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger('')
 
-from pylibcommons import libprint, libkw
+from pylibcommons import libprint, libkw, libprocess, libprocess
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(prefix = "+", logger = log.debug)
-    instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
-    future = instance.start(timeout = kwargs['timeout'])
-    if callback_before_wait:
-        callback_before_wait(instance)
-    if wait_for_initialization:
-        output = future.result()
-        if output == private.InitializationState.STOPPED:
-            log.info("Interrupted")
-            instance.stop()
-    libprint.print_func_info(prefix = "-", logger = log.debug)
-    server = _try_create_server([instance], **kwargs)
-    if server is None:
-        return instance
-    return (instance, server)
+    try:
+        instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
+        future = instance.start(timeout = kwargs['timeout'])
+        if callback_before_wait:
+            callback_before_wait(instance)
+        if wait_for_initialization:
+            output = future.result()
+            if output == private.InitializationState.STOPPED:
+                log.info("Interrupted")
+                instance.stop()
+        server = _try_create_server([instance], **kwargs)
+        if server is None:
+            return instance
+        return (instance, server)
+    finally:
+        libprint.print_func_info(prefix = "-", logger = log.debug)
 
 def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(prefix = "+", logger = log.debug)
@@ -78,7 +80,13 @@ def get_url(instance):
         return [get_url(i) for i in instance]
     return instance.get_url()
 
+def print_logging_levels():
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    for log in loggers:
+        print(f"{log} {id(log)}")
+
 def set_logging_level(log_level):
+    logging.basicConfig(level = logging.DEBUG)
     expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
     if not log_level in expected_levels.keys():
         raise Exception(f'{log_level} is not supported. Should be {",".join(expected_levels.keys())}')
@@ -86,6 +94,7 @@ def set_logging_level(log_level):
         loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
         for log in loggers:
             log.setLevel(level = expected_levels[log_level])
+            print(f"{log} {id(log)}")
 
 def _try_create_server(instances, **kwargs):
     server_port = libkw.handle_kwargs("server", default_output = None, **kwargs)

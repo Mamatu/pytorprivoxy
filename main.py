@@ -5,9 +5,9 @@ from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE, SIG_DFL)
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger('')
 
-from pylibcommons import libkw, libthread, libprint
+from pylibcommons import libkw, libthread, libprint, libprocess
 
 def _instances_append(instance):
     global __instances
@@ -79,7 +79,7 @@ def main():
     start_main(**vars(args))
 
 def start_main(**kwargs):
-    arg_log_level = libkw.handle_kwargs("log_level", default_output = "INFO", **kwargs)
+    arg_log_level = libkw.handle_kwargs("log_level", default_output = "DEBUG", **kwargs)
     arg_stdout = libkw.handle_kwargs("stdout", default_output = False, **kwargs)
     arg_password_from_file = libkw.handle_kwargs("password_from_file", default_output = None, **kwargs)
     arg_start = libkw.handle_kwargs("start", default_output = None, **kwargs)
@@ -137,9 +137,7 @@ def start_main(**kwargs):
         raise e
 
 def start_main_async(**kwargs):
-    arg_log_level = libkw.handle_kwargs("log_level", default_output = "INFO", **kwargs)
-    if arg_log_level:
-        lib.set_logging_level(arg_log_level)
+    arg_log_level = libkw.handle_kwargs("log_level", default_output = "DEBUG", **kwargs)
     if arg_log_level:
         lib.set_logging_level(arg_log_level)
     def target(stop_control, **_kwargs):

@@ -6,7 +6,7 @@ import threading
 import time
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger('')
 
 from pylibcommons import libprint
 from pylibcommons import libprocess
@@ -17,7 +17,6 @@ from stem import Signal
 from private import libcontroller
 
 class _Process:
-    log = log.getChild(__name__)
     def __init__(self):
         self.is_destroyed_flag = False
         self.lock = threading.Lock()
@@ -219,10 +218,12 @@ class _PrivoxyProcess(libprocess.Process):
     def start(self):
         super().start()
     def stop(self):
-        libprint.print_func_info(prefix = "+", logger = log.info)
+        libprint.print_func_info(prefix = "DEBUG__", logger = log.info)
         super().stop()
+        libprint.print_func_info(prefix = "DEBUG__", logger = log.info)
         if hasattr(self, "config"):
             self.config.close()
+        libprint.print_func_info(prefix = "DEBUG__", logger = log.info)
     def wait(self, **kwargs):
         libprint.print_func_info(prefix = "+", logger = log.info)
         super().wait(exception_on_error = True, print_stdout = True, print_stderr = True)
@@ -257,8 +258,11 @@ class _Instance:
             self.cv.notify()
     def _stop(self):
         self.ready = False
+        libprint.print_func_info(prefix = "DEBUG__", logger = log.debug)
         self.tor_process.stop()
+        libprint.print_func_info(prefix = "DEBUG__", logger = log.debug)
         self.privoxy_process.stop()
+        libprint.print_func_info(prefix = "DEBUG__", logger = log.debug)
     def _run_initialization(self, timeout = 60, delay = 0.5):
         def thread_func(self, timeout, delay):
             try:

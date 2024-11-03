@@ -5,7 +5,6 @@ from pylibcommons import libprint
 from private.lib import is_port_open
 
 import logging
-glog = logging.getLogger("pytorprivoxy")
 
 def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
     start_time = time.time()
@@ -21,13 +20,13 @@ def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1)
         raise Exception(timeout_msg)
 
 def test_interrupt_initialization():
-    global glog
+    libprint.set_global_string("test_interrupt_initialization")
     assert is_port_open(9000)
     assert is_port_open(9001)
     assert is_port_open(9002)
     start_time = time.time()
     import logging
-    log = logging.getLogger("pytorprivoxy")
+    log = logging.getLogger('')
     thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), stdout = True)
     time.sleep(15)
     main.stop_all()
@@ -38,14 +37,14 @@ def test_interrupt_initialization():
     time.sleep(5)
 
 def test_initialize():
-    global glog
+    libprint.set_global_string("test_initialize")
     assert is_port_open(9000)
     assert is_port_open(9001)
     assert is_port_open(9002)
     assert is_port_open(9003)
     start_time = time.time()
     import logging
-    log = logging.getLogger("pytorprivoxy")
+    log = logging.getLogger('')
     thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), server = 9003, stdout = True)
     time.sleep(1)
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
@@ -69,6 +68,7 @@ def _get_ip_address(data):
         return None
 
 def test_checkip():
+    libprint.set_global_string("test_checkip")
     server_port = 9003
     assert is_port_open(9000)
     assert is_port_open(9001)
@@ -76,7 +76,7 @@ def test_checkip():
     assert is_port_open(server_port)
     start_time = time.time()
     import logging
-    log = logging.getLogger("pytorprivoxy")
+    log = logging.getLogger('')
     thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), server = server_port, stdout = True)
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
     instance = main.get_instance(0)
@@ -105,7 +105,7 @@ def test_newnym():
     assert is_port_open(server_port)
     start_time = time.time()
     import logging
-    log = logging.getLogger("pytorprivoxy")
+    log = logging.getLogger('')
     main_async_kwargs = {"log_level": "DEBUG", "start": (9000, 9001, 9002), "server": server_port, "stdout": True}
     thread, stop_control = main.start_main_async(**main_async_kwargs)
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
@@ -149,7 +149,7 @@ def test_newnym_2_instances():
     assert is_port_open(server_port), f"{server_port}"
     start_time = time.time()
     import logging
-    log = logging.getLogger("pytorprivoxy")
+    log = logging.getLogger('')
     main_async_kwargs = {"log_level": "INFO", "start": [[9000, 9001, 9002], [9003, 9004, 9005]], "server": server_port, "stdout": True}
     thread, stop_control = main.start_main_async(**main_async_kwargs)
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 2, timeout_msg = "main.get_count_of_instances() != 2")

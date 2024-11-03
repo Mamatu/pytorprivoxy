@@ -1,7 +1,7 @@
 from pylibcommons import libprint, libprocess
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger('')
 
 import time
 import json
