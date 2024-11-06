@@ -3,9 +3,60 @@ from private import libcmds
 import sys
 
 import logging
-log = logging.getLogger('')
+log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libprint, libkw, libprocess, libprocess
+
+class PyTorPrivoxySingle:
+    def __init__(self, socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+        self.socks_port = socks_port
+        self.control_port = control_port
+        self.listen_port = listen_port
+        self.callback_before_wait = callback_before_wait
+        self.wait_for_initialization = wait_for_initialization
+        self.kwargs = kwargs
+        self.instance = None
+        self.server = None
+    def __enter__(self):
+        libprint.print_func_info(logger = log.info, extra_string = f"{self.callback_before_wait}")
+        self.instance = start(self.socks_port, self.control_port, self.listen_port, self.callback_before_wait, self.wait_for_initialization, **self.kwargs)
+        if isinstance(self.instance, tuple):
+            self.server = self.instance[1]
+            self.instance = self.instance[0]
+        libprint.print_func_info(logger = log.info)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        libprint.print_func_info(logger = log.info)
+        self.instance.join()
+        libprint.print_func_info(logger = log.info)
+        #stop(self.instance)
+        if self.server:
+            libprint.print_func_info(logger = log.info)
+            self.server.stop()
+            libprint.print_func_info(logger = log.info)
+        libprint.print_func_info(logger = log.info)
+
+class PyTorPrivoxyMultiple:
+    def __init__(self, ports, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+        self.ports = ports
+        self.callback_before_wait = callback_before_wait
+        self.wait_for_initialization = wait_for_initialization
+        self.kwargs = kwargs
+        self.instances = None
+    def __enter__(self):
+        libprint.print_func_info(logger = log.info, extra_string = f"{self.callback_before_wait}")
+        self.instances = start_multiple(self.ports, self.callback_before_wait, self.wait_for_initialization, **self.kwargs)
+        if isinstance(self.instances, tuple):
+            self.server = self.instance[1]
+            self.instances = self.instances[0]
+        libprint.print_func_info(logger = log.info)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        libprint.print_func_info(logger = log.info)
+        for instance in self.instances:
+            instance.join()
+        #stop(self.instances)
+        if self.server:
+            self.server.stop()
+        libprint.print_func_info(logger = log.info)
 
 def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(prefix = "+", logger = log.debug)
@@ -118,9 +169,13 @@ def _try_create_server(instances, **kwargs):
         return server
     return None
 
+stdout_handler = None
 def enable_stdout():
-    handler = logging.StreamHandler(sys.stdout)
-    log.addHandler(handler)
+    global stdout_handler
+    if stdout_handler is None:
+        handler = logging.StreamHandler(sys.stdout)
+        log.addHandler(handler)
+        stdout_handler = handler
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]

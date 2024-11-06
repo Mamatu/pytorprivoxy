@@ -2,7 +2,7 @@ from pylibcommons import libprint
 import telnetlib
 
 import logging
-log = logging.getLogger('')
+log = logging.getLogger('pytorprivoxy')
 
 def write(address, port, cmds):
     libprint.print_func_info(prefix = "+", logger = log.debug, extra_string = f"cmds: {cmds}")

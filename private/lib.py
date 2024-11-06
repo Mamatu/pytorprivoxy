@@ -6,7 +6,7 @@ import threading
 import time
 
 import logging
-log = logging.getLogger('')
+log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libprint
 from pylibcommons import libprocess
@@ -258,11 +258,8 @@ class _Instance:
             self.cv.notify()
     def _stop(self):
         self.ready = False
-        libprint.print_func_info(prefix = "DEBUG__", logger = log.debug)
         self.tor_process.stop()
-        libprint.print_func_info(prefix = "DEBUG__", logger = log.debug)
         self.privoxy_process.stop()
-        libprint.print_func_info(prefix = "DEBUG__", logger = log.debug)
     def _run_initialization(self, timeout = 60, delay = 0.5):
         def thread_func(self, timeout, delay):
             try:
@@ -287,9 +284,13 @@ class _Instance:
     def write_telnet_cmd_authenticate(self, cmd):
         self.write_telnet_cmd(["authenticate", cmd])
     def join(self):
+        libprint.print_func_info(logger = log.debug)
         with self.cv:
+            libprint.print_func_info(logger = log.debug)
             while not self.quit:
+                libprint.print_func_info(logger = log.debug)
                 self.cv.wait()
+                libprint.print_func_info(logger = log.debug)
         self._stop()
     def restart(self):
         self._stop()

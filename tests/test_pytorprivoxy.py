@@ -26,7 +26,7 @@ def test_interrupt_initialization():
     assert is_port_open(9002)
     start_time = time.time()
     import logging
-    log = logging.getLogger('')
+    log = logging.getLogger('pytorprivoxy')
     thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), stdout = True)
     time.sleep(15)
     main.stop_all()
@@ -44,19 +44,22 @@ def test_initialize():
     assert is_port_open(9003)
     start_time = time.time()
     import logging
-    log = logging.getLogger('')
-    thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), server = 9003, stdout = True)
+    log = logging.getLogger('pytorprivoxy')
+    ports = (9000, 9001, 9002)
+    thread, stop_control = main.start_main_async(log_level = "DEBUG", start = ports, server = 9003, stdout = True)
     time.sleep(1)
-    while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
+    _cond = lambda: not main.get_count_of_instances() == 1
+    while_with_timeout(2, _cond, timeout_msg = "No instance found")
     instance = main.get_instance(0)
-    while not instance.is_ready():
-        time.sleep(1)
+    timeout_msg = "instance.is_ready: {instance.is_ready()} server: {main.get_server()}"
+    while_with_timeout(60, lambda: not instance.is_ready() or not main.get_server(), timeout_msg = timeout_msg)
     main.stop_all()
     stop_control.stop()
     thread.join()
     end_time = time.time()
     assert (end_time - start_time) <= 60
     time.sleep(5)
+    main.clear_server()
 
 def _get_ip_address(data):
     try:
@@ -76,11 +79,14 @@ def test_checkip():
     assert is_port_open(server_port)
     start_time = time.time()
     import logging
-    log = logging.getLogger('')
-    thread, stop_control = main.start_main_async(log_level = "DEBUG", start = (9000, 9001, 9002), server = server_port, stdout = True)
-    while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
+    log = logging.getLogger('pytorprivoxy')
+    ports = (9000, 9001, 9002)
+    thread, stop_control = main.start_main_async(log_level = "DEBUG", start = ports, server = server_port, stdout = True)
+    _cond = lambda: not main.get_count_of_instances() == 1
+    while_with_timeout(2, _cond, timeout_msg = "No instance found")
     instance = main.get_instance(0)
-    while_with_timeout(60, lambda: not instance.is_ready(), timeout_msg = "Not ready")
+    _cond1 = lambda: not instance.is_ready() or not main.get_server()
+    while_with_timeout(60, _cond1, timeout_msg = "Not ready")
     from multiprocessing.connection import Client
     with Client(("localhost", server_port)) as client:
         import json
@@ -95,6 +101,7 @@ def test_checkip():
     end_time = time.time()
     assert (end_time - start_time) <= 65
     time.sleep(5)
+    main.clear_server()
 
 def test_newnym():
     libprint.set_global_string("test_newnym")
@@ -105,12 +112,12 @@ def test_newnym():
     assert is_port_open(server_port)
     start_time = time.time()
     import logging
-    log = logging.getLogger('')
+    log = logging.getLogger('pytorprivoxy')
     main_async_kwargs = {"log_level": "DEBUG", "start": (9000, 9001, 9002), "server": server_port, "stdout": True}
     thread, stop_control = main.start_main_async(**main_async_kwargs)
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 1, timeout_msg = "No instance found")
     instance = main.get_instance(0)
-    while_with_timeout(60, lambda: not instance.is_ready(), timeout_msg = "Not ready")
+    while_with_timeout(60, lambda: not instance.is_ready() or not main.get_server(), timeout_msg = "Not ready")
     from multiprocessing.connection import Client
     libprint.print_func_info(logger = log.info, prefix = "+")
     with Client(("localhost", server_port)) as client:
@@ -136,6 +143,7 @@ def test_newnym():
         assert (end_time - start_time) <= 65
     libprint.print_func_info(logger = log.info, prefix = "-")
     time.sleep(5)
+    main.clear_server()
 
 def test_newnym_2_instances():
     libprint.set_global_string("test_newnym_2_instances")
@@ -149,13 +157,15 @@ def test_newnym_2_instances():
     assert is_port_open(server_port), f"{server_port}"
     start_time = time.time()
     import logging
-    log = logging.getLogger('')
-    main_async_kwargs = {"log_level": "INFO", "start": [[9000, 9001, 9002], [9003, 9004, 9005]], "server": server_port, "stdout": True}
+    log = logging.getLogger('pytorprivoxy')
+    ports = [[9000, 9001, 9002], [9003, 9004, 9005]]
+    main_async_kwargs = {"log_level": "INFO", "start": ports, "server": server_port, "stdout": True}
     thread, stop_control = main.start_main_async(**main_async_kwargs)
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 2, timeout_msg = "main.get_count_of_instances() != 2")
     instance1 = main.get_instance(0)
     instance2 = main.get_instance(1)
-    while_with_timeout(60, lambda: not instance1.is_ready() or not instance2.is_ready(), timeout_msg = "Not ready")
+    _cond = lambda: not instance1.is_ready() or not instance2.is_ready() or main.get_server()
+    while_with_timeout(60, _cond, timeout_msg = "Not ready")
     from multiprocessing.connection import Client
     with Client(("localhost", server_port)) as client:
         #import json
@@ -176,3 +186,4 @@ def test_newnym_2_instances():
         assert ipaddress1 != ipaddress2
         assert (end_time - start_time) <= 70
     time.sleep(5)
+    main.clear_server()

@@ -1,7 +1,7 @@
 from stem.control import Controller
 
 import logging
-log = logging.getLogger('')
+log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libprint
 

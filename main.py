@@ -5,26 +5,64 @@ from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE, SIG_DFL)
 
 import logging
-log = logging.getLogger('')
+log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libkw, libthread, libprint, libprocess
+
+class PyTorPrivoxyContext:
+    def __init__(self, ports, wait_for_initialization = True, **kwargs):
+        self.ports = ports
+        self.wait_for_initialization = wait_for_initialization
+        self.kwargs = kwargs
+        self.instances = None
+        self.server = None
+    def __enter__(self):
+        libprint.print_func_info(logger = log.info)
+        wfi = self.wait_for_initialization
+        if all(isinstance(p, list) for p in self.ports):
+            self.instances = start_multiple(self.ports, wfi, **self.kwargs)
+        else:
+            self.instances = start(*self.ports, wfi, **self.kwargs)
+        if isinstance(self.instances, tuple):
+            self.server = self.instances[1]
+            self.instances = self.instances[0]
+        if not isinstance(self.instances, list):
+            self.instances = [self.instances]
+        libprint.print_func_info(logger = log.info)
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        libprint.print_func_info(logger = log.info)
+        for instance in self.instances:
+            instance.join()
+        #stop(self.instances)
+        if self.server:
+            self.server.stop()
+        if exc_type:
+            log_string = f"{exc_type} {exc_val} {exc_tb}"
+            libprint.print_func_info(logger = log.error, extra_string = log_string)
+            raise exc_val
+        libprint.print_func_info(logger = log.info)
 
 def _instances_append(instance):
     global __instances
     __instances.append(instance)
+    libprint.print_func_info(logger = log.info, extra_string = f"{__instances}")
 
 def _instances_remove(instance):
     global __instances
     if instance in __instances:
         __instances.remove(instance)
+    libprint.print_func_info(logger = log.info, extra_string = f"{__instances}")
 
 def start(socks_port, control_port, listen_port, wait_for_initialization = True, **kwargs):
     global __instances
+    libprint.print_func_info(logger = log.info)
     callback_before_wait = lambda instance: _instances_append(instance)
     return lib.start(socks_port, control_port, listen_port, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
 
 def start_multiple(ports : list, wait_for_initialization = True, **kwargs):
     global __instances
+    libprint.print_func_info(logger = log.info)
     callback_before_wait = lambda instance: _instances_append(instance)
     return lib.start_multiple(ports, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
 
@@ -36,6 +74,15 @@ def stop(instance, remove_instance = True):
 def get_count_of_instances():
     global __instances
     return len(__instances)
+
+__server = None
+def get_server():
+    global __server
+    return __server
+
+def clear_server():
+    global __server
+    __server = None
 
 def get_instance(index):
     global __instances
@@ -97,22 +144,11 @@ def start_main(**kwargs):
         libpass.load_password_from_file(arg_password_from_file)
     try:
         def start_from_args(ports, server, **args_dict):
-            if all(isinstance(p, list) for p in ports):
-                instances = start_multiple(ports, **args_dict, server = server)
-                server = None
-                if isinstance(instances, tuple):
-                    server = instances[1]
-                    instances = instances[0]
-                for instance in instances:
-                    instance.join()
-            else:
-                instance = start(*ports, server = server, **args_dict)
-                if isinstance(instance, tuple):
-                    server = instance[1]
-                    instance = instance[0]
-                instance.join()
-            if server:
-                server.stop()
+            libprint.print_func_info(logger = log.info, extra_string = f"args_dict: {args_dict}")
+            with PyTorPrivoxyContext(ports, server = server, **args_dict) as ctx:
+                global __server
+                libprint.print_func_info(logger = log.info)
+                __server = ctx.server
         server = None
         if arg_start:
             start_from_args(arg_start, arg_server, **args_dict)
