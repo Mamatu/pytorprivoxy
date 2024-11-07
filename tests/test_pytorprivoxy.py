@@ -164,7 +164,7 @@ def test_newnym_2_instances():
     while_with_timeout(2, lambda: not main.get_count_of_instances() == 2, timeout_msg = "main.get_count_of_instances() != 2")
     instance1 = main.get_instance(0)
     instance2 = main.get_instance(1)
-    _cond = lambda: not instance1.is_ready() or not instance2.is_ready() or main.get_server()
+    _cond = lambda: not instance1.is_ready() or not instance2.is_ready() or not main.get_server()
     while_with_timeout(60, _cond, timeout_msg = "Not ready")
     from multiprocessing.connection import Client
     with Client(("localhost", server_port)) as client:

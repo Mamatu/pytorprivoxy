@@ -43,50 +43,63 @@ class PyTorPrivoxyContext:
             raise exc_val
         libprint.print_func_info(logger = log.info)
 
-def _instances_append(instance):
-    global __instances
-    __instances.append(instance)
-    libprint.print_func_info(logger = log.info, extra_string = f"{__instances}")
+class PyTorPrivoxyApp:
+    def __init__(**kwargs):
+        self.log_level = libkw.handle_kwargs("log_level", default_output = "DEBUG", **kwargs)
+        self.stdout = libkw.handle_kwargs("stdout", default_output = False, **kwargs)
+        self.password_from_file = libkw.handle_kwargs("password_from_file", default_output = None, **kwargs)
+        self.start = libkw.handle_kwargs("start", default_output = None, **kwargs)
+        self.start_from_file = libkw.handle_kwargs("start_from_file", default_output = None, **kwargs)
+        self.server = libkw.handle_kwargs("server", default_output = None, **kwargs)
+        self.timeout = libkw.handle_kwargs("timeout", default_output = 300, **kwargs)
+        self.success_factor = libkw.handle_kwargs("success_factor", default_output = 1., **kwargs)
+        self.tor_privoxy_ctx = None
+    def __enter__(self):
+        if self.log_level:
+            lib.set_logging_level(self.log_level)
+        if self.stdout:
+            lib.enable_stdout()
+        args_dict = {"timeout" : self.timeout, "success_factor" : self.success_factor}
+        if self.password_from_file:
+            from private import libpass
+            libpass.load_password_from_file(self.password_from_file)
+        server = None
+        _ports = None
+        if self.start:
+            _ports = self.start
+        elif self.start_from_file:
+            ports_all = []
+            with open(self.start_from_file, "r") as f:
+                lines = f.readlines()
+            for line in lines:
+                ports = line.split()
+                if len(ports) != 3:
+                    raise Exception(f"Line {line} contains invalid number of prots (it must be 3)")
+                try:
+                    ports = [int(p) for p in ports]
+                except ValueError:
+                    raise Exception(f"Element of {ports} cannot be converted into int")
+                ports_all.append(list(ports))
+            _ports = ports_all
+        self.tor_privoxy_ctx = PyTorPrivoxyContext(_ports, server = server, instance_append = None, **args_dict)
+        return tor_privoxy_ctx.__enter__()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.tor_privoxy_ctx(exc_type, exc_val, exc_tb)
 
-def _instances_remove(instance):
-    global __instances
-    if instance in __instances:
-        __instances.remove(instance)
-    libprint.print_func_info(logger = log.info, extra_string = f"{__instances}")
-
-def start(socks_port, control_port, listen_port, wait_for_initialization = True, **kwargs):
-    global __instances
+def start(socks_port, control_port, listen_port, _instance_append = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(logger = log.info)
-    callback_before_wait = lambda instance: _instances_append(instance)
+    callback_before_wait = lambda instance: if _instance_append: _instance_append(instance)
     return lib.start(socks_port, control_port, listen_port, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
 
-def start_multiple(ports : list, wait_for_initialization = True, **kwargs):
-    global __instances
+def start_multiple(ports : list, _instance_append = None, wait_for_initialization = True, **kwargs):
     libprint.print_func_info(logger = log.info)
-    callback_before_wait = lambda instance: _instances_append(instance)
+    callback_before_wait = lambda instance: if _instance_append: _instance_append(instance)
     return lib.start_multiple(ports, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
 
 def stop(instance, remove_instance = True):
     lib.stop(instance)
     if remove_instance:
         _instances_remove(instance)
-
-def get_count_of_instances():
-    global __instances
-    return len(__instances)
-
-__server = None
-def get_server():
-    global __server
-    return __server
-
-def clear_server():
-    global __server
-    __server = None
-
-def get_instance(index):
-    global __instances
-    return __instances[index]
 
 def stop_all():
     global __instances
