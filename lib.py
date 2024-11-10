@@ -7,77 +7,12 @@ log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libprint, libkw, libprocess, libprocess
 
-class PyTorPrivoxySingle:
-    def __init__(self, socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-        self.socks_port = socks_port
-        self.control_port = control_port
-        self.listen_port = listen_port
-        self.callback_before_wait = callback_before_wait
-        self.wait_for_initialization = wait_for_initialization
-        self.kwargs = kwargs
-        self.instance = None
-        self.server = None
-    def __enter__(self):
-        libprint.print_func_info(logger = log.info, extra_string = f"{self.callback_before_wait}")
-        self.instance = start(self.socks_port, self.control_port, self.listen_port, self.callback_before_wait, self.wait_for_initialization, **self.kwargs)
-        if isinstance(self.instance, tuple):
-            self.server = self.instance[1]
-            self.instance = self.instance[0]
-        libprint.print_func_info(logger = log.info)
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        libprint.print_func_info(logger = log.info)
-        self.instance.join()
-        libprint.print_func_info(logger = log.info)
-        #stop(self.instance)
-        if self.server:
-            libprint.print_func_info(logger = log.info)
-            self.server.stop()
-            libprint.print_func_info(logger = log.info)
-        libprint.print_func_info(logger = log.info)
+def start(socks_port : int, control_port : int, listen_port : int, **kwargs):
+    return start_multiple([(socks_port, control_port, listen_port)], **kwargs)
 
-class PyTorPrivoxyMultiple:
-    def __init__(self, ports, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-        self.ports = ports
-        self.callback_before_wait = callback_before_wait
-        self.wait_for_initialization = wait_for_initialization
-        self.kwargs = kwargs
-        self.instances = None
-    def __enter__(self):
-        libprint.print_func_info(logger = log.info, extra_string = f"{self.callback_before_wait}")
-        self.instances = start_multiple(self.ports, self.callback_before_wait, self.wait_for_initialization, **self.kwargs)
-        if isinstance(self.instances, tuple):
-            self.server = self.instance[1]
-            self.instances = self.instances[0]
-        libprint.print_func_info(logger = log.info)
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        libprint.print_func_info(logger = log.info)
-        for instance in self.instances:
-            instance.join()
-        #stop(self.instances)
-        if self.server:
-            self.server.stop()
-        libprint.print_func_info(logger = log.info)
-
-def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-    libprint.print_func_info(prefix = "+", logger = log.debug)
-    try:
-        instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
-        future = instance.start(timeout = kwargs['timeout'])
-        if callback_before_wait:
-            callback_before_wait(instance)
-        if wait_for_initialization:
-            output = future.result()
-            if output == private.InitializationState.STOPPED:
-                log.info("Interrupted")
-                instance.stop()
-        server = _try_create_server([instance], **kwargs)
-        if server is None:
-            return instance
-        return (instance, server)
-    finally:
-        libprint.print_func_info(prefix = "-", logger = log.debug)
-
-def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+def start_multiple(ports : list, **kwargs):
+    callback_before_wait = libkw.handle_kwargs("callback_before_wait", default_output = None)
+    wait_for_initialization = libkw.handle_kwargs("wait_for_initialization", default_output = False)
     libprint.print_func_info(prefix = "+", logger = log.debug)
     def invalid_ports(ports):
         raise Exception(f"Ports must be list of int tuple or int list (of 3 size): it is: {ports}")
@@ -107,9 +42,13 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
         libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"results for initialization {results}")
     server = _try_create_server(instances, **kwargs)
     libprint.print_func_info(prefix = "-", logger = log.debug)
-    if server is None:
-        return instances
-    return (instances, server)
+    output = {}
+    output["instances"] = instances
+    if server:
+        output["server"] = server
+    if not wait_for_initialization:
+        output["futures"] = futures
+    return output
 
 def stop(instance):
     if isinstance(instance, list):
@@ -117,6 +56,13 @@ def stop(instance):
             i.stop()
     else:
         stop([instance])
+
+def join(instance):
+    if isinstance(instance, list):
+        for i in instance:
+            i.join()
+    else:
+        join([instance])
 
 def control(instance, cmd):
     instance.write_telnet_cmd(cmd)
@@ -131,11 +77,6 @@ def get_url(instance):
         return [get_url(i) for i in instance]
     return instance.get_url()
 
-def print_logging_levels():
-    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-    for log in loggers:
-        print(f"{log} {id(log)}")
-
 def set_logging_level(log_level):
     logging.basicConfig(level = logging.DEBUG)
     expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
@@ -148,7 +89,7 @@ def set_logging_level(log_level):
             print(f"{log} {id(log)}")
 
 def _try_create_server(instances, **kwargs):
-    server_port = libkw.handle_kwargs("server", default_output = None, **kwargs)
+    server_port = libkw.handle_kwargs("server_port", default_output = None, **kwargs)
     if server_port is not None:
         from pylibcommons import libserver
         def handler(line, client):

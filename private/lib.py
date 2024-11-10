@@ -218,12 +218,12 @@ class _PrivoxyProcess(libprocess.Process):
     def start(self):
         super().start()
     def stop(self):
-        libprint.print_func_info(prefix = "DEBUG__", logger = log.info)
+        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         super().stop()
-        libprint.print_func_info(prefix = "DEBUG__", logger = log.info)
+        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         if hasattr(self, "config"):
+            libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
             self.config.close()
-        libprint.print_func_info(prefix = "DEBUG__", logger = log.info)
     def wait(self, **kwargs):
         libprint.print_func_info(prefix = "+", logger = log.info)
         super().wait(exception_on_error = True, print_stdout = True, print_stderr = True)
@@ -239,6 +239,7 @@ class InitializationState(enum.Enum):
 class _Instance:
     log = log.getChild(__name__)
     def __init__(self, tor_process, privoxy_process):
+        libprint.print_func_info(extra_string = f"DEBUG__")
         self.ready = False
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
@@ -252,14 +253,20 @@ class _Instance:
         self.tor_process.start()
         return self._run_initialization()
     def stop(self):
+        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         self._stop()
+        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         with self.cv:
             self.quit = True
             self.cv.notify()
+        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
     def _stop(self):
         self.ready = False
+        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         self.tor_process.stop()
+        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         self.privoxy_process.stop()
+        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
     def _run_initialization(self, timeout = 60, delay = 0.5):
         def thread_func(self, timeout, delay):
             try:
@@ -275,6 +282,7 @@ class _Instance:
             self._executor = concurrent.ThreadPoolExecutor()
         return self._executor.submit(thread_func, self, timeout, delay)
     def write_telnet_cmd(self, cmd):
+        libprint.print_func_info(print_current_time = True, extra_string = f"Telnet cmd")
         from private import libtelnet
         libtelnet.write("localhost", self.tor_process.control_port, cmd)
     def get_url(self):

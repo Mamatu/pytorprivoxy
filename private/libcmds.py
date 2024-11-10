@@ -7,7 +7,7 @@ import time
 import json
 
 def handle_line(line, instances):
-    libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
+    libprint.print_func_info(prefix = "+", logger = log.debug, extra_string = f"line: {line}")
     return _handle_line(line, instances)
 
 def get_instances(ports, instances, callback):
@@ -22,6 +22,7 @@ def get_instances(ports, instances, callback):
     return output
 
 def _get_commands(instances):
+    libprint.print_func_info(logger = log.debug)
     def convert(a):
         try:
             if a == "all":
@@ -33,12 +34,12 @@ def _get_commands(instances):
             raise ve
     _commands = {}
     def _stop(instances, args):
-        libprint.print_func_info(logger = log.info)
+        libprint.print_func_info(logger = log.debug)
         from pylibcommons.libserver import StopExecution
         return StopExecution()
     _commands["stop"] = _stop
     def _read(instances, args):
-        libprint.print_func_info(logger = log.info)
+        libprint.print_func_info(logger = log.debug)
         if len(args) != 0:
             extra_string = "read: it requires no argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
@@ -47,7 +48,7 @@ def _get_commands(instances):
         return str(ports)
     _commands["read"] = _read
     def _newnym(instances, args):
-        libprint.print_func_info(logger = log.info)
+        libprint.print_func_info(logger = log.debug)
         control_ports = [convert(a) for a in args]
         instances = get_instances(control_ports, instances, lambda x: x.tor_process.control_port)
         for instance in instances:
@@ -56,7 +57,7 @@ def _get_commands(instances):
         return json.dumps({"status" : "ok"})
     _commands["newnym"] = _newnym
     def _checkip(instances, args):
-        libprint.print_func_info(logger = log.info)
+        libprint.print_func_info(logger = log.debug)
         if len(args) == 0:
             extra_string = "checkip: it requires at least a one argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
@@ -67,10 +68,10 @@ def _get_commands(instances):
         for instance in instances:
             command = f"curl -x \"http://localhost:{instance.privoxy_process.listen_port}\" http://httpbin.org/ip"
             process = libprocess.Process(command, use_temp_file = True, shell = True)
-            libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"Run command {command}")
+            libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"Run command {command}")
             process.start()
             process.wait(exception_on_error = True, print_stdout = True, print_stderr = True)
-            libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"After command {command}")
+            libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"After command {command}")
             if process.is_stdout():
                 stdout = process.get_stdout()
                 if output is None:
@@ -82,7 +83,7 @@ def _get_commands(instances):
         return output
     _commands["checkip"] = _checkip
     def _restart(instances, args):
-        libprint.print_func_info(logger = log.info)
+        libprint.print_func_info(logger = log.debug)
         if len(args) == 0:
             extra_string = "checkip: it requires at least a one argument"
             libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
@@ -97,14 +98,14 @@ def _get_commands(instances):
 def _handle_line(line, instances):
     import re
     line = line.rstrip()
-    libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"line: {line}")
+    libprint.print_func_info(prefix = "+", logger = log.debug, extra_string = f"line: {line}")
     command = re.split('\\s+', line)
     if len(command) == 0:
         libprint.print_func_info(prefix = "*", logger = log.error, extra_string = "line does not contain any command")
         return
     handle_cmds = _get_commands(instances)
     if command[0] in handle_cmds.keys():
-        libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"{command[0]} {command[1:]}")
+        libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{command[0]} {command[1:]}")
         return handle_cmds[command[0]](instances, command[1:])
     else:
         libprint.print_func_info(prefix = "-", logger = log.error, extra_string = f"Does not found handler for command {command[0]}")
