@@ -11,37 +11,39 @@ from pylibcommons import libkw, libthread, libprint, libprocess
 
 class PyTorPrivoxyContext:
     class Ctx:
-        def __init__(self, output):
+        def __init__(self, output, root_ctx):
             self.instances = output.get("instances", None)
             self.server = output.get("server", None)
             self.futures = output.get("futures", None)
+            self.root_ctx = root_ctx
         def stop_all(self):
-            for i in self.instances:
-                lib.stop(i)
-            if self.server:
-                self.server.stop()
+            lib.stop(self.instances)
+            self.root_ctx.stop_server()
     def __init__(self, ports, **kwargs):
         self.ports = ports
         self.kwargs = kwargs
         self.instances = None
         self.server = None
     def __enter__(self):
-        output = None
+        outpu = None
         if all(isinstance(p, list) for p in self.ports):
             output = lib.start_multiple(self.ports, **self.kwargs)
         else:
             output = lib.start(*self.ports, **self.kwargs)
         self.instances = output.get("instances", None)
         self.server = output.get("server", None)
-        return PyTorPrivoxyContext.Ctx(output)
+        return PyTorPrivoxyContext.Ctx(output, self)
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             lib.stop(self.instances)
             lib.join(self.instances)
+            self.stop_server()
             log_string = f"{exc_type} {exc_val} {exc_tb}"
             libprint.print_func_info(logger = log.error, extra_string = log_string)
             raise exc_val
         lib.join(self.instances)
+        self.stop_server()
+    def stop_server(self):
         if self.server:
             self.server.stop()
 

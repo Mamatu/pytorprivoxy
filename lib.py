@@ -86,7 +86,6 @@ def set_logging_level(log_level):
         loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
         for log in loggers:
             log.setLevel(level = expected_levels[log_level])
-            print(f"{log} {id(log)}")
 
 def _try_create_server(instances, **kwargs):
     server_port = libkw.handle_kwargs("server_port", default_output = None, **kwargs)

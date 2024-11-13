@@ -57,7 +57,7 @@ class _Process:
         if self.process:
             self.process.wait()
 
-class _TorProcess(_Process):
+class _TorProcess(libprocess.Process):
     class Stopped(Exception):
         pass
     class LineError(Exception):
@@ -85,7 +85,8 @@ class _TorProcess(_Process):
         self.stop_flag = False
         log.info(f"Instace of tor process: {self.id_ports()}")
         libprint.print_func_info(prefix = "-", logger = log.debug)
-        super().__init__()
+        self.config = self.__make_config(self.socks_port, self.control_port, self.listen_port, self.data_directory.name)
+        super().__init__(cmd = ["tor", "-f", self.config.name])
     def is_initialized(self):
         libprint.print_func_info(prefix = "+", logger = log.debug)
         try:
@@ -145,10 +146,8 @@ class _TorProcess(_Process):
         return status
     def was_stopped(self):
         return self.stop_flag
-    def start(self):
-        self.config = self.__make_config(self.socks_port, self.control_port, self.listen_port, self.data_directory.name)
-        super().start(["tor", "-f", self.config.name])
     def stop(self):
+        super().stop()
         self._stop()
         self.stop_flag = True
         self.was_initialized = False
@@ -218,11 +217,8 @@ class _PrivoxyProcess(libprocess.Process):
     def start(self):
         super().start()
     def stop(self):
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         super().stop()
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         if hasattr(self, "config"):
-            libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
             self.config.close()
     def wait(self, **kwargs):
         libprint.print_func_info(prefix = "+", logger = log.info)
@@ -239,7 +235,6 @@ class InitializationState(enum.Enum):
 class _Instance:
     log = log.getChild(__name__)
     def __init__(self, tor_process, privoxy_process):
-        libprint.print_func_info(extra_string = f"DEBUG__")
         self.ready = False
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
@@ -253,20 +248,14 @@ class _Instance:
         self.tor_process.start()
         return self._run_initialization()
     def stop(self):
-        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         self._stop()
-        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         with self.cv:
             self.quit = True
             self.cv.notify()
-        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
     def _stop(self):
         self.ready = False
-        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         self.tor_process.stop()
-        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         self.privoxy_process.stop()
-        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
     def _run_initialization(self, timeout = 60, delay = 0.5):
         def thread_func(self, timeout, delay):
             try:

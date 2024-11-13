@@ -9,17 +9,14 @@ import logging
 def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
     start_time = time.time()
     timeouted = False
-    libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
     while condition():
         if time.time() - start_time >= timeout:
             timeouted = True
             break
         time.sleep(time_sleep)
-    libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
     if timeouted:
         if timeout_msg is None:
             timeout_msg = "Timeout in while"
-        libprint.print_func_info(extra_string = f"DEBUG__", print_current_time = True)
         raise Exception(timeout_msg)
 
 def test_interrupt_initialization():
@@ -50,26 +47,18 @@ def test_initialize():
     import logging
     log = logging.getLogger('pytorprivoxy')
     ports = (9000, 9001, 9002)
-    libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
     def callback(ctx, stop_control):
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         _cond = lambda: not len(ctx.instances) == 1
         while_with_timeout(2, _cond, timeout_msg = "No instance found")
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         assert len(ctx.instances) == 1
         instance = ctx.instances[0]
         timeout_msg = f"instance.is_ready: {instance.is_ready()} server: {ctx.server}"
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         while_with_timeout(60, lambda: not instance.is_ready() or not ctx.server, timeout_msg = timeout_msg)
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         ctx.stop_all()
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
         stop_control.stop()
-        libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
     thread = main.start_main_async(callback, log_level = "DEBUG", start = ports, server_port = 9003, stdout = True)
     thread.join()
     end_time = time.time()
-    libprint.print_func_info(print_current_time = True, extra_string = f"DEBUG__")
     assert (end_time - start_time) <= 60
 
 def _get_ip_address(data):
