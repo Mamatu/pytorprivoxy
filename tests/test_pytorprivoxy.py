@@ -19,6 +19,8 @@ def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1)
             timeout_msg = "Timeout in while"
         raise Exception(timeout_msg)
 
+TEST_LOG_LEVEL = "DEBUG"
+
 def test_interrupt_initialization():
     libprint.set_global_string("test_interrupt_initialization")
     assert is_port_open(9000)
@@ -31,7 +33,7 @@ def test_interrupt_initialization():
         time.sleep(15)
         ctx.stop_all()
         stop_control.stop()
-    thread = main.start_main_async(callback, log_level = "DEBUG", start = (9000, 9001, 9002), stdout = True)
+    thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = (9000, 9001, 9002), stdout = True)
     libprint.print_func_info(logger = log.info)
     thread.join()
     end_time = time.time()
@@ -56,7 +58,7 @@ def test_initialize():
         while_with_timeout(60, lambda: not instance.is_ready() or not ctx.server, timeout_msg = timeout_msg)
         ctx.stop_all()
         stop_control.stop()
-    thread = main.start_main_async(callback, log_level = "DEBUG", start = ports, server_port = 9003, stdout = True)
+    thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = ports, server_port = 9003, stdout = True)
     thread.join()
     end_time = time.time()
     assert (end_time - start_time) <= 60
@@ -97,7 +99,7 @@ def test_checkip():
             client.send("stop")
         ctx.stop_all()
         stop_control.stop()
-    thread = main.start_main_async(callback, log_level = "DEBUG", start = ports, server_port = server_port, stdout = True)
+    thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = ports, server_port = server_port, stdout = True)
     thread.join()
     end_time = time.time()
     assert (end_time - start_time) <= 65
@@ -129,7 +131,7 @@ def test_newnym():
     start_time = time.time()
     import logging
     log = logging.getLogger('pytorprivoxy')
-    main_async_kwargs = {"log_level": "DEBUG", "start": (9000, 9001, 9002), "server_port": server_port, "stdout": True}
+    main_async_kwargs = {"log_level": TEST_LOG_LEVEL, "start": (9000, 9001, 9002), "server_port": server_port, "stdout": True}
     def callback(ctx, stop_control):
         _cond = lambda: not len(ctx.instances) == 1
         while_with_timeout(2, _cond, timeout_msg = "No instance found")
@@ -172,7 +174,7 @@ def test_newnym_2_instances():
     import logging
     log = logging.getLogger('pytorprivoxy')
     ports = [[9000, 9001, 9002], [9003, 9004, 9005]]
-    main_async_kwargs = {"log_level": "INFO", "start": ports, "server_port": server_port, "stdout": True}
+    main_async_kwargs = {"log_level": TEST_LOG_LEVEL, "start": ports, "server_port": server_port, "stdout": True}
     def callback(ctx, stop_control):
         while_with_timeout(2, lambda: not len(ctx.instances) == 2, timeout_msg = "main.get_count_of_instances() != 2")
         instance1 = ctx.instances[0]
