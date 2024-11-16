@@ -1,5 +1,4 @@
 import lib
-__instances = []
 
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE, SIG_DFL)
@@ -89,7 +88,7 @@ class PyTorPrivoxyAppContext:
                     raise Exception(f"Element of {ports} cannot be converted into int")
                 ports_all.append(list(ports))
             _ports = ports_all
-        self.tor_privoxy_ctx = PyTorPrivoxyContext(_ports, server_port = self.server_port, instance_append = None, **args_dict)
+        self.tor_privoxy_ctx = PyTorPrivoxyContext(_ports, server_port = self.server_port, **args_dict)
         libprint.print_func_info(logger = log.info)
         return self.tor_privoxy_ctx.__enter__()
     def __exit__(self, exc_type, exc_val, exc_tb):

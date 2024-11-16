@@ -16,47 +16,6 @@ import concurrent.futures as concurrent
 from stem import Signal
 from private import libcontroller
 
-class _Process:
-    def __init__(self):
-        self.is_destroyed_flag = False
-        self.lock = threading.Lock()
-        self.process = None
-        self.cmd = ""
-    def was_stopped(self):
-        return self.is_destroyed_flag
-    def emit_warning_during_destroy(self, ex):
-        log.warning(f"{ex}: please verify if process {self.cmd} was properly closed")
-    def start(self, cmd):
-        self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
-        log.info(f"Start process {self.process}")
-    def stop(self):
-        self.is_destroyed_flag = True
-        if not hasattr(self, "process"):
-            return
-        if self.process is None:
-            return
-        with self.lock:
-            self.process.stdout.close()
-            self.process.stderr.close()
-        try:
-            from private import libterminate
-            libterminate.terminate_subprocess(self.process)
-            log.info(f"Stop process {self.process}")
-            self.process = None
-        except psutil.NoSuchProcess as nsp:
-            self.emit_warning_during_destroy(nsp)
-        except subprocess.TimeoutExpired as te:
-            self.emit_warning_during_destroy(te)
-    def callback_safe(self, callback):
-        try:
-            with self.lock:
-                return callback()
-        except Exception as ex:
-            raise ex
-    def wait(self):
-        if self.process:
-            self.process.wait()
-
 class _TorProcess(libprocess.Process):
     class Stopped(Exception):
         pass
@@ -83,29 +42,33 @@ class _TorProcess(libprocess.Process):
         self.control_port = control_port
         self.listen_port = listen_port
         self.stop_flag = False
+        self.stdout_len = 0
         log.info(f"Instace of tor process: {self.id_ports()}")
         libprint.print_func_info(prefix = "-", logger = log.debug)
         self.config = self.__make_config(self.socks_port, self.control_port, self.listen_port, self.data_directory.name)
-        super().__init__(cmd = ["tor", "-f", self.config.name])
+        super().__init__(cmd = f"tor -f {self.config.name}")
     def is_initialized(self):
         libprint.print_func_info(prefix = "+", logger = log.debug)
         try:
             if self.was_initialized:
                 return True
             is_initialized_str = "Bootstrapped 100% (done): Done"
-            def run_safe():
-                nonlocal self
-                line = self.process.stdout.readline()
-                line = line.replace("\n", "")
-                log.info(f"{self.id_ports()} {line}")
-                if "[err]" in line:
-                    raise _TorProcess.LineError(str(line))
-                if is_initialized_str in line:
-                    log.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
-                    self.was_initialized = True
-                    return True
-                return False
-            return self.callback_safe(run_safe)
+            def check_lines():
+                lines = self.get_stdout_lines_copy()
+                try:
+                    for line in lines[self.stdout_len:]:
+                        line = line.replace("\n", "")
+                        log.info(f"{self.id_ports()} {line}")
+                        if "[err]" in line:
+                            raise _TorProcess.LineError(str(line))
+                        if is_initialized_str in line:
+                            log.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
+                            self.was_initialized = True
+                            return True
+                    return False
+                finally:
+                    self.stdout_len = len(lines)
+            return check_lines()
         except Exception as ex:
             log.error(f"{self.id_ports()} {ex}")
             raise ex
@@ -151,6 +114,7 @@ class _TorProcess(libprocess.Process):
         self._stop()
         self.stop_flag = True
         self.was_initialized = False
+        self.config.close()
     def get_url(self):
         return f"http://127.0.0.1:{self.listen_port}"
     def init_controller(self):
