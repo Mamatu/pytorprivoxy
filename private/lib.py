@@ -47,8 +47,8 @@ class _TorProcess(libprocess.Process):
         libprint.print_func_info(prefix = "-", logger = log.debug)
         self.config = self.__make_config(self.socks_port, self.control_port, self.listen_port, self.data_directory.name)
         super().__init__(cmd = f"tor -f {self.config.name}")
+    @libprint.func_info(logger = log.debug)
     def is_initialized(self):
-        libprint.print_func_info(prefix = "+", logger = log.debug)
         try:
             if self.was_initialized:
                 return True
@@ -58,22 +58,26 @@ class _TorProcess(libprocess.Process):
                 try:
                     for line in lines[self.stdout_len:]:
                         line = line.replace("\n", "")
-                        log.info(f"{self.id_ports()} {line}")
+                        log_kwargs = {}
+                        log_kwargs['print_filename'] = False
+                        log_kwargs['print_function'] = False
+                        log_kwargs['print_linenumber'] = False
+                        libprint.print_func_info(logger = log.info, extra_string = f"{self.id_ports()} Tor log: {line}", **log_kwargs)
                         if "[err]" in line:
                             raise _TorProcess.LineError(str(line))
                         if is_initialized_str in line:
-                            log.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
+                            log_string = f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}"
+                            libprint.print_func_info(logger = log.info, extra_string = log_string, **log_kwargs)
                             self.was_initialized = True
                             return True
                     return False
                 finally:
-                    self.stdout_len = len(lines)
+                    if len(lines) > self.stdout_len:
+                        self.stdout_len = len(lines)
             return check_lines()
         except Exception as ex:
             log.error(f"{self.id_ports()} {ex}")
             raise ex
-        finally:
-            libprint.print_func_info(prefix = "-", logger = log.debug)
     @staticmethod
     def wait_for_initialization(callback_is_initialized, callback_to_stop, timeout = 300, delay = 0.5):
         libprint.print_func_info(prefix = "+", logger = log.debug)
@@ -258,6 +262,8 @@ class _Instance:
         self.start()
     def is_ready(self):
         return self.ready
+    def get_pids(self):
+        return [self.tor_process.get_pid(), self.privoxy_process.get_pid()]
 
 def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
     start_time = time.time()

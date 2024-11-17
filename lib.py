@@ -64,6 +64,14 @@ def join(instance):
     else:
         join([instance])
 
+def get_pids(instance):
+    if isinstance(instance, list):
+        pids = []
+        for i in instance:
+            pids = pids + get_pids(i)
+        return pids
+    return instance.get_pids()
+
 def control(instance, cmd):
     instance.write_telnet_cmd(cmd)
 

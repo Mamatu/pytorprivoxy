@@ -5,6 +5,39 @@ from pylibcommons import libprint
 from private.lib import is_port_open
 
 import logging
+log = logging.getLogger('pytorprivoxy')
+
+import os
+TEST_LOG_LEVEL = os.environ.get("TEST_LOG_LEVEL")
+if TEST_LOG_LEVEL is None:
+    TEST_LOG_LEVEL = "DEBUG"
+
+TEST_DELAY_BETWEEN = os.environ.get("TEST_DELAY_BETWEEN")
+if TEST_DELAY_BETWEEN is None:
+    TEST_DELAY_BETWEEN = 10
+
+TEST_INITIALIZATION_TIMEOUT = os.environ.get("TEST_INITIALIZATION_TIMEOUT")
+if TEST_INITIALIZATION_TIMEOUT is None:
+    TEST_INITIALIZATION_TIMEOUT = 120
+
+import psutil
+
+PIDS = []
+def teardown_function(function):
+    global PIDS
+    libprint.print_func_info(logger = log.info)
+    time.sleep(TEST_DELAY_BETWEEN)
+    try:
+        for proc in psutil.process_iter(['pid', 'name']):
+            for pid in PIDS:
+                if pid == proc.info['pid']:
+                    raise Exception(f"Process is still running: {proc.info}")
+            if 'tor' == proc.info['name']:
+                raise Exception(f"Tor process is still running: {proc.info}")
+            if 'privoxy' == proc.info['name']:
+                raise Exception(f"Privoxy process is still running: {proc.info}")
+    finally:
+        PIDS = []
 
 def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
     start_time = time.time()
@@ -19,9 +52,8 @@ def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1)
             timeout_msg = "Timeout in while"
         raise Exception(timeout_msg)
 
-TEST_LOG_LEVEL = "DEBUG"
-
 def test_interrupt_initialization():
+    global PIDS
     libprint.set_global_string("test_interrupt_initialization")
     assert is_port_open(9000)
     assert is_port_open(9001)
@@ -29,8 +61,10 @@ def test_interrupt_initialization():
     start_time = time.time()
     import logging
     log = logging.getLogger('pytorprivoxy')
+    pids = []
     def callback(ctx, stop_control):
         time.sleep(15)
+        PIDS = ctx.get_pids()
         ctx.stop_all()
         stop_control.stop()
     thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = (9000, 9001, 9002), stdout = True)
@@ -55,7 +89,8 @@ def test_initialize():
         assert len(ctx.instances) == 1
         instance = ctx.instances[0]
         timeout_msg = f"instance.is_ready: {instance.is_ready()} server: {ctx.server}"
-        while_with_timeout(60, lambda: not instance.is_ready() or not ctx.server, timeout_msg = timeout_msg)
+        PIDS = ctx.get_pids()
+        while_with_timeout(TEST_INITIALIZATION_TIMEOUT, lambda: not instance.is_ready() or not ctx.server, timeout_msg = timeout_msg)
         ctx.stop_all()
         stop_control.stop()
     thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = ports, server_port = 9003, stdout = True)
@@ -88,7 +123,8 @@ def test_checkip():
         while_with_timeout(2, _cond, timeout_msg = "No instance found")
         instance = ctx.instances[0]
         _cond1 = lambda: not instance.is_ready() or not ctx.server
-        while_with_timeout(60, _cond1, timeout_msg = "Not ready")
+        PIDS = ctx.get_pids()
+        while_with_timeout(TEST_INITIALIZATION_TIMEOUT, _cond1, timeout_msg = "Not ready")
         from multiprocessing.connection import Client
         with Client(("localhost", server_port)) as client:
             import json
@@ -137,7 +173,8 @@ def test_newnym():
         while_with_timeout(2, _cond, timeout_msg = "No instance found")
         instance = ctx.instances[0]
         _cond1 = lambda: not instance.is_ready() or not ctx.server
-        while_with_timeout(60, _cond1, timeout_msg = "Not ready")
+        PIDS = ctx.get_pids()
+        while_with_timeout(TEST_INITIALIZATION_TIMEOUT, _cond1, timeout_msg = "Not ready")
         from multiprocessing.connection import Client
         ip_addresses = None
         with Client(("localhost", server_port)) as client:
@@ -180,7 +217,8 @@ def test_newnym_2_instances():
         instance1 = ctx.instances[0]
         instance2 = ctx.instances[1]
         _cond = lambda: not instance1.is_ready() or not instance2.is_ready() or not ctx.server
-        while_with_timeout(60, _cond, timeout_msg = "Not ready")
+        PIDS = ctx.get_pids()
+        while_with_timeout(TEST_INITIALIZATION_TIMEOUT, _cond, timeout_msg = "Not ready")
         from multiprocessing.connection import Client
         ip_addresses = None
         with Client(("localhost", server_port)) as client:

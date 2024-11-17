@@ -18,6 +18,8 @@ class PyTorPrivoxyContext:
         def stop_all(self):
             lib.stop(self.instances)
             self.root_ctx.stop_server()
+        def get_pids(self):
+            return lib.get_pids(self.instances)
     def __init__(self, ports, **kwargs):
         self.ports = ports
         self.kwargs = kwargs
@@ -34,14 +36,21 @@ class PyTorPrivoxyContext:
         return PyTorPrivoxyContext.Ctx(output, self)
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
+            libprint.print_func_info(extra_string = "DEBUG__")
             lib.stop(self.instances)
+            libprint.print_func_info(extra_string = "DEBUG__")
             lib.join(self.instances)
+            libprint.print_func_info(extra_string = "DEBUG__")
             self.stop_server()
+            libprint.print_func_info(extra_string = "DEBUG__")
             log_string = f"{exc_type} {exc_val} {exc_tb}"
             libprint.print_func_info(logger = log.error, extra_string = log_string)
             raise exc_val
+        libprint.print_func_info(extra_string = "DEBUG__")
         lib.join(self.instances)
+        libprint.print_func_info(extra_string = "DEBUG__")
         self.stop_server()
+        libprint.print_func_info(extra_string = "DEBUG__")
     def stop_server(self):
         if self.server:
             self.server.stop()
