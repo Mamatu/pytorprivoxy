@@ -218,7 +218,8 @@ def test_newnym_2_instances():
         instance2 = ctx.instances[1]
         _cond = lambda: not instance1.is_ready() or not instance2.is_ready() or not ctx.server
         PIDS = ctx.get_pids()
-        while_with_timeout(TEST_INITIALIZATION_TIMEOUT, _cond, timeout_msg = "Not ready")
+        log_string = f"Not ready {instance1.is_ready()} {instance2.is_ready()} {ctx.server}"
+        while_with_timeout(TEST_INITIALIZATION_TIMEOUT, _cond, timeout_msg = log_string)
         from multiprocessing.connection import Client
         ip_addresses = None
         with Client(("localhost", server_port)) as client:
