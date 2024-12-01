@@ -35,6 +35,7 @@ class PyTorPrivoxyContext:
         self.server = output.get("server", None)
         return PyTorPrivoxyContext.Ctx(output, self)
     def __exit__(self, exc_type, exc_val, exc_tb):
+        libprint.print_func_info(logger = log.debug)
         if exc_type:
             lib.stop(self.instances)
             try:
@@ -44,11 +45,13 @@ class PyTorPrivoxyContext:
             log_string = f"{exc_type} {exc_val} {exc_tb}"
             libprint.print_func_info(logger = log.error, extra_string = log_string)
             raise exc_val
+        lib.stop(self.instances)
         try:
             lib.join(self.instances)
         finally:
             self.stop_server()
     def stop_server(self):
+        libprint.print_func_info(logger = log.debug)
         if self.server:
             self.server.stop()
 

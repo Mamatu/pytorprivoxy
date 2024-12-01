@@ -51,6 +51,7 @@ def start_multiple(ports : list, **kwargs):
     return output
 
 def stop(instance):
+    libprint.print_func_info(logger = log.debug)
     if isinstance(instance, list):
         for i in instance:
             i.stop()
@@ -58,6 +59,7 @@ def stop(instance):
         stop([instance])
 
 def join(instance):
+    libprint.print_func_info(logger = log.debug)
     if isinstance(instance, list):
         for i in instance:
             i.join()
