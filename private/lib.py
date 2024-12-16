@@ -10,6 +10,7 @@ log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libprint
 from pylibcommons import libprocess
+from pylibcommons import libkw
 
 import concurrent.futures as concurrent
 
@@ -213,10 +214,10 @@ class _Instance:
         self._executor = None
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
-    def start(self, timeout = 60, delay = 0.5):
+    def start(self, **kwargs):
         self.privoxy_process.start()
         self.tor_process.start()
-        return self._run_initialization()
+        return self._run_initialization(**kwargs)
     @libprint.func_info(logger = log.debug)
     def stop(self):
         self._stop()
@@ -228,7 +229,7 @@ class _Instance:
         self.ready = False
         self.privoxy_process.stop()
         self.tor_process.stop()
-    def _run_initialization(self, timeout = 60, delay = 0.5):
+    def _run_initialization(self, **kwargs):
         def thread_func(self, timeout, delay):
             try:
                 output = self.tor_process.wait_for_initialization(timeout, delay)
@@ -241,6 +242,8 @@ class _Instance:
                 return False
         if self._executor is None:
             self._executor = concurrent.ThreadPoolExecutor()
+        timeout = libkw.handle_kwargs("timeout", default_output = 3600, **kwargs)
+        delay = libkw.handle_kwargs("delay", default_output = 0.5, **kwargs)
         return self._executor.submit(thread_func, self, timeout, delay)
     def write_telnet_cmd(self, cmd):
         libprint.print_func_info(print_current_time = True, extra_string = f"Telnet cmd")

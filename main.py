@@ -1,6 +1,6 @@
 import lib
 
-from signal import signal, SIGPIPE, SIG_DFL
+from signal import signal, SIGPIPE, SIGINT, SIG_DFL
 signal(SIGPIPE, SIG_DFL)
 
 import logging
@@ -26,17 +26,22 @@ class PyTorPrivoxyContext:
         self.instances = None
         self.server = None
     def __enter__(self):
-        outpu = None
-        if all(isinstance(p, list) for p in self.ports):
-            output = lib.start_multiple(self.ports, **self.kwargs)
-        else:
-            output = lib.start(*self.ports, **self.kwargs)
-        self.instances = output.get("instances", None)
-        self.server = output.get("server", None)
-        return PyTorPrivoxyContext.Ctx(output, self)
+        libprint.print_func_info(logger = log.debug)
+        try:
+            output = None
+            if all(isinstance(p, list) for p in self.ports):
+                output = lib.start_multiple(self.ports, **self.kwargs)
+            else:
+                output = lib.start(*self.ports, **self.kwargs)
+            self.instances = output.get("instances", None)
+            self.server = output.get("server", None)
+            return PyTorPrivoxyContext.Ctx(output, self)
+        finally:
+            libprint.print_func_info(logger = log.debug)
     def __exit__(self, exc_type, exc_val, exc_tb):
         libprint.print_func_info(logger = log.debug)
         if exc_type:
+            libprint.print_func_info(logger = log.debug)
             lib.stop(self.instances)
             try:
                 lib.join(self.instances)
@@ -44,12 +49,15 @@ class PyTorPrivoxyContext:
                 self.stop_server()
             log_string = f"{exc_type} {exc_val} {exc_tb}"
             libprint.print_func_info(logger = log.error, extra_string = log_string)
+            libprint.print_func_info(logger = log.debug)
             raise exc_val
         lib.stop(self.instances)
         try:
             lib.join(self.instances)
         finally:
+            libprint.print_func_info(logger = log.debug)
             self.stop_server()
+        libprint.print_func_info(logger = log.debug)
     def stop_server(self):
         libprint.print_func_info(logger = log.debug)
         if self.server:
@@ -134,9 +142,25 @@ def start_main_async(callback = None, **kwargs):
     thread.start()
     return thread
 
+import sys
+import threading
+
+event = threading.Event()
+
+def sigint_handler(signal, frame):
+    event.set()
+
+def sigint_callback(ctx):
+    event.wait()
+    ctx.stop_all()
+
 if __name__ == "__main__":
     try:
-        main()
+        signal(SIGINT, sigint_handler)
+        main(callback = sigint_callback)
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        libprint.print_func_info(extra_string = f"{e} {tb}", logger = log.error)
         import sys
         sys.exit(1)
