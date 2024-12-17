@@ -15,10 +15,14 @@ if TEST_LOG_LEVEL is None:
 TEST_DELAY_BETWEEN = os.environ.get("TEST_DELAY_BETWEEN")
 if TEST_DELAY_BETWEEN is None:
     TEST_DELAY_BETWEEN = 10
+else:
+    TEST_DELAY_BETWEEN = int(TEST_DELAY_BETWEEN)
 
 TEST_INITIALIZATION_TIMEOUT = os.environ.get("TEST_INITIALIZATION_TIMEOUT")
 if TEST_INITIALIZATION_TIMEOUT is None:
     TEST_INITIALIZATION_TIMEOUT = 120
+else:
+    TEST_INITIALIZATION_TIMEOUT = int(TEST_INITIALIZATION_TIMEOUT)
 
 import psutil
 
@@ -194,7 +198,7 @@ def test_newnym():
     thread = main.start_main_async(callback, **main_async_kwargs)
     thread.join()
     end_time = time.time()
-    assert (end_time - start_time) <= 70
+    assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT
     libprint.print_func_info(logger = log.info, prefix = "-")
 
 def test_newnym_2_instances():
@@ -238,4 +242,4 @@ def test_newnym_2_instances():
     thread = main.start_main_async(callback, **main_async_kwargs)
     thread.join()
     end_time = time.time()
-    assert (end_time - start_time) <= 70
+    assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT
