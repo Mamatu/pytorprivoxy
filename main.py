@@ -18,6 +18,9 @@ class PyTorPrivoxyContext:
         def stop_all(self):
             lib.stop(self.instances)
             self.root_ctx.stop_server()
+            if self.futures:
+                for f in self.futures:
+                    f.result()
         def get_pids(self):
             return lib.get_pids(self.instances)
     def __init__(self, ports, **kwargs):
