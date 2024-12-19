@@ -7,6 +7,8 @@ log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libprint, libkw, libprocess, libprocess
 
+import concurrent.futures as concurrent
+
 def start(socks_port : int, control_port : int, listen_port : int, **kwargs):
     return start_multiple([(socks_port, control_port, listen_port)], **kwargs)
 
@@ -28,7 +30,8 @@ def start_multiple(ports : list, **kwargs):
             else:
                 invalid_ports(ports)
     check_ports(ports)
-    instances = [private._make_tor_privoxy_none_block(*pt) for pt in ports]
+    _executor = concurrent.ThreadPoolExecutor()
+    instances = [private._make_tor_privoxy_none_block(*pt, _executor) for pt in ports]
     libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
     futures = []
     for i in instances:

@@ -12,8 +12,6 @@ from pylibcommons import libprint
 from pylibcommons import libprocess
 from pylibcommons import libkw
 
-import concurrent.futures as concurrent
-
 from stem import Signal
 from private import libcontroller
 
@@ -205,13 +203,13 @@ class InitializationState(enum.Enum):
     STOPPED = 2
 
 class _Instance:
-    def __init__(self, tor_process, privoxy_process):
+    def __init__(self, tor_process, privoxy_process, executor):
         self.ready = False
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
         self.quit = False
         self.cv = threading.Condition()
-        self._executor = None
+        self._executor = executor
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
     def start(self, **kwargs):
@@ -240,8 +238,6 @@ class _Instance:
                     return InitializationState.TIMEOUT
             except _TorProcess.Stopped:
                 return False
-        if self._executor is None:
-            self._executor = concurrent.ThreadPoolExecutor()
         timeout = libkw.handle_kwargs("timeout", default_output = 3600, **kwargs)
         delay = libkw.handle_kwargs("delay", default_output = 0.5, **kwargs)
         return self._executor.submit(thread_func, self, timeout, delay)
@@ -300,10 +296,10 @@ def _while_port_used(port : int) -> bool:
 def is_port_open(port : int) -> bool:
     return not _while_port_used(port)
 
-def _make_tor_privoxy_none_block(socks_port, control_port, listen_port):
+def _make_tor_privoxy_none_block(socks_port, control_port, listen_port, executor):
     libprint.print_func_info(prefix = "+", logger = log.debug)
     privoxy_process = _PrivoxyProcess(socks_port = socks_port, listen_port = listen_port)
     tor_process = _TorProcess(socks_port = socks_port, control_port = control_port, listen_port = listen_port)
-    instance = _Instance(tor_process = tor_process, privoxy_process = privoxy_process)
+    instance = _Instance(tor_process = tor_process, privoxy_process = privoxy_process, executor = executor)
     libprint.print_func_info(prefix = "-", logger = log.debug)
     return instance
