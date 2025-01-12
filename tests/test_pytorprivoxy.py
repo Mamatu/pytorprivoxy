@@ -100,7 +100,7 @@ def test_initialize():
     thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = ports, server_port = 9003, stdout = True)
     thread.join()
     end_time = time.time()
-    assert (end_time - start_time) <= 60
+    assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT
 
 def _get_ip_address(data):
     try:
@@ -142,7 +142,7 @@ def test_checkip():
     thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = ports, server_port = server_port, stdout = True)
     thread.join()
     end_time = time.time()
-    assert (end_time - start_time) <= 65
+    assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT
 
 class IPAddressIdenticalException(Exception):
     def __init__(self, ipaddress1, ipaddress2):
