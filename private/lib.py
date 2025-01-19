@@ -6,57 +6,16 @@ import threading
 import time
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger('pytorprivoxy')
 
 from pylibcommons import libprint
-
-import concurrent.futures as concurrent
+from pylibcommons import libprocess
+from pylibcommons import libkw
 
 from stem import Signal
 from private import libcontroller
 
-class _Process:
-    log = log.getChild(__name__)
-    def __init__(self):
-        self.is_destroyed_flag = False
-        self.lock = threading.Lock()
-        self.process = None
-    def was_stopped(self):
-        return self.is_destroyed_flag
-    def emit_warning_during_destroy(self, ex):
-        log.warning(f"{ex}: please verify if process {self.cmd} was properly closed")
-    def start(self, cmd):
-        self.process = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
-        log.info(f"Start process {self.process}")
-    def stop(self):
-        self.is_destroyed_flag = True
-        if not hasattr(self, "process"):
-            return
-        if self.process is None:
-            return
-        with self.lock:
-            self.process.stdout.close()
-            self.process.stderr.close()
-        try:
-            from private import libterminate
-            libterminate.terminate_subprocess(self.process)
-            log.info(f"Stop process {self.process}")
-            self.process = None
-        except psutil.NoSuchProcess as nsp:
-            self.emit_warning_during_destroy(nsp)
-        except subprocess.TimeoutExpired as te:
-            self.emit_warning_during_destroy(te)
-    def callback_safe(self, callback):
-        try:
-            with self.lock:
-                return callback()
-        except Exception as ex:
-            raise ex
-    def wait(self):
-        if self.process:
-            self.process.wait()
-
-class _TorProcess(_Process):
+class _TorProcess(libprocess.Process):
     class Stopped(Exception):
         pass
     class LineError(Exception):
@@ -82,33 +41,41 @@ class _TorProcess(_Process):
         self.control_port = control_port
         self.listen_port = listen_port
         self.stop_flag = False
+        self.stdout_len = 0
         log.info(f"Instace of tor process: {self.id_ports()}")
         libprint.print_func_info(prefix = "-", logger = log.debug)
-        super().__init__()
+        self.config = self.__make_config(self.socks_port, self.control_port, self.listen_port, self.data_directory.name)
+        super().__init__(cmd = f"tor -f {self.config.name}")
     def is_initialized(self):
-        libprint.print_func_info(prefix = "+", logger = log.debug)
         try:
             if self.was_initialized:
                 return True
             is_initialized_str = "Bootstrapped 100% (done): Done"
-            def run_safe():
-                nonlocal self
-                line = self.process.stdout.readline()
-                line = line.replace("\n", "")
-                log.info(f"{self.id_ports()} {line}")
-                if "[err]" in line:
-                    raise _TorProcess.LineError(str(line))
-                if is_initialized_str in line:
-                    log.info(f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}")
-                    self.was_initialized = True
-                    return True
-                return False
-            return self.callback_safe(run_safe)
+            def check_lines():
+                lines = self.get_stdout_lines_copy()
+                try:
+                    for line in lines[self.stdout_len:]:
+                        line = line.replace("\n", "")
+                        log_kwargs = {}
+                        log_kwargs['print_filename'] = False
+                        log_kwargs['print_function'] = False
+                        log_kwargs['print_linenumber'] = False
+                        libprint.print_func_info(logger = log.info, extra_string = f"{self.id_ports()} Tor log: {line}", **log_kwargs)
+                        if "[err]" in line:
+                            raise _TorProcess.LineError(str(line))
+                        if is_initialized_str in line:
+                            log_string = f"{self.id_ports()} Initialized: {self.socks_port} {self.control_port} {self.listen_port}"
+                            libprint.print_func_info(logger = log.info, extra_string = log_string, **log_kwargs)
+                            self.was_initialized = True
+                            return True
+                    return False
+                finally:
+                    if len(lines) > self.stdout_len:
+                        self.stdout_len = len(lines)
+            return check_lines()
         except Exception as ex:
             log.error(f"{self.id_ports()} {ex}")
             raise ex
-        finally:
-            libprint.print_func_info(prefix = "-", logger = log.debug)
     @staticmethod
     def wait_for_initialization(callback_is_initialized, callback_to_stop, timeout = 300, delay = 0.5):
         libprint.print_func_info(prefix = "+", logger = log.debug)
@@ -144,13 +111,13 @@ class _TorProcess(_Process):
         return status
     def was_stopped(self):
         return self.stop_flag
-    def start(self):
-        self.config = self.__make_config(self.socks_port, self.control_port, self.listen_port, self.data_directory.name)
-        super().start(["tor", "-f", self.config.name])
+    @libprint.func_info(logger = log.debug)
     def stop(self):
+        super().stop()
         self._stop()
         self.stop_flag = True
         self.was_initialized = False
+        self.config.close()
     def get_url(self):
         return f"http://127.0.0.1:{self.listen_port}"
     def init_controller(self):
@@ -179,6 +146,7 @@ class _TorProcess(_Process):
             raise ex
         finally:
             libprint.print_func_info(prefix = "-", logger = log.debug)
+    @libprint.func_info(logger = log.debug)
     def _stop(self):
         libprint.print_func_info(prefix = "+", logger = log.debug)
         self.stop_flag = True
@@ -193,7 +161,7 @@ class _TorProcess(_Process):
     def get_info(self, parameter):
         return self.controller.get_info(parameter)
 
-class _PrivoxyProcess(_Process):
+class _PrivoxyProcess(libprocess.Process):
     def __make_config(self, socks_port, listen_port):
         config = tempfile.NamedTemporaryFile(mode = "w")
         config.write(f"forward-socks5t / 127.0.0.1:{socks_port} .\n")
@@ -202,19 +170,29 @@ class _PrivoxyProcess(_Process):
         config.write("default-server-timeout 600\n")
         config.write("socket-timeout 600\n")
         config.flush()
+        import os
+        os.chmod(config.name, 0o777)
         return config
     def __init__(self, socks_port, listen_port):
         self.config = None
         self.socks_port = socks_port
         self.listen_port = listen_port
-        super().__init__()
-    def start(self):
+        libprint.print_func_info(prefix = "+", logger = log.info)
         self.config = self.__make_config(self.socks_port, self.listen_port)
-        super().start(["privoxy", "--no-daemon", self.config.name])
+        cmd = f"privoxy --no-daemon {self.config.name}"
+        libprint.print_func_info(prefix = "+", logger = log.info, extra_string = f"privoxy cmd: {cmd}")
+        super().__init__(cmd = cmd)
+    @libprint.func_info(logger = log.debug)
+    def start(self):
+        super().start()
+    @libprint.func_info(logger = log.debug)
     def stop(self):
         super().stop()
         if hasattr(self, "config"):
             self.config.close()
+    def wait(self, **kwargs):
+        libprint.print_func_info(prefix = "+", logger = log.info)
+        super().wait(exception_on_error = True, print_stdout = True, print_stderr = True)
     def get_listen_port(self):
         return self.listen_port
 
@@ -225,44 +203,46 @@ class InitializationState(enum.Enum):
     STOPPED = 2
 
 class _Instance:
-    log = log.getChild(__name__)
-    def __init__(self, tor_process, privoxy_process):
-        self.usable = False
+    def __init__(self, tor_process, privoxy_process, executor):
+        self.ready = False
         self.tor_process = tor_process
         self.privoxy_process = privoxy_process
         self.quit = False
         self.cv = threading.Condition()
-        self._executor = None
+        self._executor = executor
     def __eq__(self, other):
         return self.tor_process == other.tor_process and self.privoxy_process == other.tor_process
-    def start(self, timeout = 60, delay = 0.5):
-        self.tor_process.start()
+    def start(self, **kwargs):
         self.privoxy_process.start()
-        return self._run_initialization()
+        self.tor_process.start()
+        return self._run_initialization(**kwargs)
+    @libprint.func_info(logger = log.debug)
     def stop(self):
         self._stop()
         with self.cv:
             self.quit = True
             self.cv.notify()
+    @libprint.func_info(logger = log.debug)
     def _stop(self):
-        self.usable = False
-        self.tor_process.stop()
+        self.ready = False
         self.privoxy_process.stop()
-    def _run_initialization(self, timeout = 60, delay = 0.5):
+        self.tor_process.stop()
+    def _run_initialization(self, **kwargs):
         def thread_func(self, timeout, delay):
             try:
                 output = self.tor_process.wait_for_initialization(timeout, delay)
                 if output:
-                    self.usable = True
+                    self.ready = True
                     return InitializationState.OK
                 else:
                     return InitializationState.TIMEOUT
             except _TorProcess.Stopped:
                 return False
-        if self._executor is None:
-            self._executor = concurrent.ThreadPoolExecutor()
+        timeout = libkw.handle_kwargs("timeout", default_output = 3600, **kwargs)
+        delay = libkw.handle_kwargs("delay", default_output = 0.5, **kwargs)
         return self._executor.submit(thread_func, self, timeout, delay)
     def write_telnet_cmd(self, cmd):
+        libprint.print_func_info(print_current_time = True, extra_string = f"Telnet cmd")
         from private import libtelnet
         libtelnet.write("localhost", self.tor_process.control_port, cmd)
     def get_url(self):
@@ -272,22 +252,54 @@ class _Instance:
     def write_telnet_cmd_authenticate(self, cmd):
         self.write_telnet_cmd(["authenticate", cmd])
     def join(self):
+        libprint.print_func_info(logger = log.debug)
         with self.cv:
+            libprint.print_func_info(logger = log.debug)
             while not self.quit:
+                libprint.print_func_info(logger = log.debug)
                 self.cv.wait()
+                libprint.print_func_info(logger = log.debug)
+        self._stop()
     def restart(self):
         self._stop()
         self.start()
+    def is_ready(self):
+        return self.ready
+    def get_pids(self):
+        return [self.tor_process.get_pid(), self.privoxy_process.get_pid()]
+
+def while_with_timeout(timeout, condition, timeout_msg = None, time_sleep = 0.1):
+    start_time = time.time()
+    timeouted = False
+    while condition():
+        if time.time() - start_time >= timeout:
+            timeouted = True
+            break
+        time.sleep(time_sleep)
+    if timeouted:
+        if timeout_msg is None:
+            timeout_msg = "Timeout in while"
+        raise Exception(timeout_msg)
 
 def _is_port_used(port : int) -> bool:
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
-def _make_tor_privoxy_none_block(socks_port, control_port, listen_port):
+def _while_port_used(port : int) -> bool:
+    try:
+        while_with_timeout(5, lambda: _is_port_used(port))
+    except Exception:
+        return True
+    return False
+
+def is_port_open(port : int) -> bool:
+    return not _while_port_used(port)
+
+def _make_tor_privoxy_none_block(socks_port, control_port, listen_port, executor):
     libprint.print_func_info(prefix = "+", logger = log.debug)
     privoxy_process = _PrivoxyProcess(socks_port = socks_port, listen_port = listen_port)
     tor_process = _TorProcess(socks_port = socks_port, control_port = control_port, listen_port = listen_port)
-    instance = _Instance(tor_process = tor_process, privoxy_process = privoxy_process)
+    instance = _Instance(tor_process = tor_process, privoxy_process = privoxy_process, executor = executor)
     libprint.print_func_info(prefix = "-", logger = log.debug)
     return instance

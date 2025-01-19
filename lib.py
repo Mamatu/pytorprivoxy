@@ -3,28 +3,18 @@ from private import libcmds
 import sys
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger('pytorprivoxy')
 
-from pylibcommons import libprint, libkw
+from pylibcommons import libprint, libkw, libprocess, libprocess
 
-def start(socks_port : int, control_port : int, listen_port : int, callback_before_wait = None, wait_for_initialization = True, **kwargs):
-    libprint.print_func_info(prefix = "+", logger = log.debug)
-    instance = private._make_tor_privoxy_none_block(socks_port, control_port, listen_port)
-    future = instance.start(timeout = kwargs['timeout'])
-    if callback_before_wait:
-        callback_before_wait(instance)
-    if wait_for_initialization:
-        output = future.result()
-        if output == private.InitializationState.STOPPED:
-            log.info("Interrupted")
-            instance.stop()
-    libprint.print_func_info(prefix = "-", logger = log.debug)
-    server = _try_create_server([instance], **kwargs)
-    if server is None:
-        return instance
-    return (instance, server)
+import concurrent.futures as concurrent
 
-def start_multiple(ports : list, callback_before_wait = None, wait_for_initialization = True, **kwargs):
+def start(socks_port : int, control_port : int, listen_port : int, **kwargs):
+    return start_multiple([(socks_port, control_port, listen_port)], **kwargs)
+
+def start_multiple(ports : list, **kwargs):
+    callback_before_wait = libkw.handle_kwargs("callback_before_wait", default_output = None)
+    wait_for_initialization = libkw.handle_kwargs("wait_for_initialization", default_output = False)
     libprint.print_func_info(prefix = "+", logger = log.debug)
     def invalid_ports(ports):
         raise Exception(f"Ports must be list of int tuple or int list (of 3 size): it is: {ports}")
@@ -40,11 +30,12 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
             else:
                 invalid_ports(ports)
     check_ports(ports)
-    instances = [private._make_tor_privoxy_none_block(*pt) for pt in ports]
+    _executor = concurrent.ThreadPoolExecutor()
+    instances = [private._make_tor_privoxy_none_block(*pt, _executor) for pt in ports]
     libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"{instances}")
     futures = []
     for i in instances:
-        future = i.start()
+        future = i.start(**kwargs)
         futures.append(future)
     if callback_before_wait:
         for i in instances: callback_before_wait(i)
@@ -54,16 +45,37 @@ def start_multiple(ports : list, callback_before_wait = None, wait_for_initializ
         libprint.print_func_info(prefix = "*", logger = log.info, extra_string = f"results for initialization {results}")
     server = _try_create_server(instances, **kwargs)
     libprint.print_func_info(prefix = "-", logger = log.debug)
-    if server is None:
-        return instances
-    return (instances, server)
+    output = {}
+    output["instances"] = instances
+    if server:
+        output["server"] = server
+    if not wait_for_initialization:
+        output["futures"] = futures
+    return output
 
 def stop(instance):
+    libprint.print_func_info(logger = log.debug)
     if isinstance(instance, list):
         for i in instance:
             i.stop()
     else:
         stop([instance])
+
+def join(instance):
+    libprint.print_func_info(logger = log.debug)
+    if isinstance(instance, list):
+        for i in instance:
+            i.join()
+    else:
+        join([instance])
+
+def get_pids(instance):
+    if isinstance(instance, list):
+        pids = []
+        for i in instance:
+            pids = pids + get_pids(i)
+        return pids
+    return instance.get_pids()
 
 def control(instance, cmd):
     instance.write_telnet_cmd(cmd)
@@ -79,6 +91,7 @@ def get_url(instance):
     return instance.get_url()
 
 def set_logging_level(log_level):
+    logging.basicConfig(level = logging.DEBUG)
     expected_levels = {"CRITICAL" : logging.CRITICAL, "ERROR" : logging.ERROR, "WARNING" : logging.WARNING, "INFO" : logging.INFO, "DEBUG" : logging.DEBUG}
     if not log_level in expected_levels.keys():
         raise Exception(f'{log_level} is not supported. Should be {",".join(expected_levels.keys())}')
@@ -88,7 +101,7 @@ def set_logging_level(log_level):
             log.setLevel(level = expected_levels[log_level])
 
 def _try_create_server(instances, **kwargs):
-    server_port = libkw.handle_kwargs("server", default_output = None, **kwargs)
+    server_port = libkw.handle_kwargs("server_port", default_output = None, **kwargs)
     if server_port is not None:
         from pylibcommons import libserver
         def handler(line, client):
@@ -101,16 +114,21 @@ def _try_create_server(instances, **kwargs):
                 return output
             except Exception as ex:
                 libprint.print_func_info(extra_string = f"{ex}", logger = log.error)
+                client.send(str(ex))
         address = ("localhost", server_port)
         libprint.print_func_info(prefix = "+", logger = log.debug)
         server = libserver.run(handler, address)
-        libprint.print_func_info(extra_string = f"Multiprocess server {server} run on {address}", logger = log.info)
+        libprint.print_func_info(prefix = "-", extra_string = f"Multiprocess server {server} run on {address}", logger = log.info)
         return server
     return None
 
+stdout_handler = None
 def enable_stdout():
-    handler = logging.StreamHandler(sys.stdout)
-    log.addHandler(handler)
+    global stdout_handler
+    if stdout_handler is None:
+        handler = logging.StreamHandler(sys.stdout)
+        log.addHandler(handler)
+        stdout_handler = handler
 
 def manage_multiple(ports : list, **kwargs):
     rpf = kwargs["runnig_pool_factor"]

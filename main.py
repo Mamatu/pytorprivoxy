@@ -1,110 +1,102 @@
 import lib
-__instances = []
 
-from signal import signal, SIGPIPE, SIG_DFL
+from signal import signal, SIGPIPE, SIGINT, SIG_DFL
 signal(SIGPIPE, SIG_DFL)
 
 import logging
-log = logging.getLogger("pytorprivoxy")
+log = logging.getLogger('pytorprivoxy')
 
-def _instances_append(instance):
-    global __instances
-    __instances.append(instance)
+from pylibcommons import libkw, libthread, libprint, libprocess
 
-def _instances_remove(instance):
-    global __instances
-    if instance in __instances:
-        __instances.remove(instance)
-
-def start(socks_port, control_port, listen_port, wait_for_initialization = True, **kwargs):
-    global __instances
-    callback_before_wait = lambda instance: _instances_append(instance)
-    return lib.start(socks_port, control_port, listen_port, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
-
-def start_multiple(ports : list, wait_for_initialization = True, **kwargs):
-    global __instances
-    callback_before_wait = lambda instance: _instances_append(instance)
-    return lib.start_multiple(ports, callback_before_wait = callback_before_wait, wait_for_initialization = wait_for_initialization, **kwargs)
-
-def stop(instance, remove_instance = True):
-    lib.stop(instance)
-    if remove_instance:
-        _instances_remove(instance)
-
-def stop_all():
-    global __instances
-    for i in __instances:
-        stop(i, remove_instance = False)
-    __instances = []
-
-import atexit
-atexit.register(stop_all)
-server = None
-
-import signal
-def signal_handler(sig, frame):
-    global server
-    log.info("Registering sig for application. It will stop all")
-    if server is not None: server.stop()
-    stop_all()
-
-signal.signal(signal.SIGINT, signal_handler)
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
-    parser.add_argument("--start_from_file", help = "like start but read ports from file", type=str)
-    parser.add_argument("--log_level", help = "logging debug: CRITICAL ERROR WARNING INFO DEBUG", type=str, default = "INFO")
-    parser.add_argument("--stdout", help = "logging into stdout", action='store_true')
-    parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
-    parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
-    parser.add_argument("--server", help = "Establish server to multiprocess communication. As argument it takes listen port", type=int, default=None)
-    parser.add_argument("--find", help = "Path to directory when should be found epoal", type=str, default=None)
-    factor_description = """
-    Factor of success of initialization after what the app will be continued, otherwise it will interrupted.
-    When is only one --start then it is ignored.
-    """
-    parser.add_argument("--success_factor", help = factor_description, type=float, default=1)
-    args = parser.parse_args()
-    if args.find:
-        import os
-        import sys
-        for root, dirs, files in os.walk(args.find):
-            for file in files:
-                if file.endswith(".epoal"):
-                    print(os.path.join(root, file))
-        sys.exit(0)
-    if args.log_level:
-        lib.set_logging_level(args.log_level)
-    if args.stdout:
-        lib.enable_stdout()
-    args_dict = {"timeout" : args.timeout, "success_factor" : args.success_factor}
-    if args.password_from_file:
-        from private import libpass
-        libpass.load_password_from_file(args.password_from_file)
-    try:
-        def start_from_args(ports, server, **args_dict):
-            if all(isinstance(p, list) for p in ports):
-                instances = start_multiple(ports, **args_dict, server = server)
-                server = None
-                if isinstance(instances, tuple):
-                    server = instances[1]
-                    instances = instances[0]
-                for instance in instances:
-                    instance.join()
+class PyTorPrivoxyContext:
+    class Ctx:
+        def __init__(self, output, root_ctx):
+            self.instances = output.get("instances", None)
+            self.server = output.get("server", None)
+            self.futures = output.get("futures", None)
+            self.root_ctx = root_ctx
+        def stop_all(self):
+            lib.stop(self.instances)
+            self.root_ctx.stop_server()
+            if self.futures:
+                for f in self.futures:
+                    f.result()
+        def get_pids(self):
+            return lib.get_pids(self.instances)
+    def __init__(self, ports, **kwargs):
+        self.ports = ports
+        self.kwargs = kwargs
+        self.instances = None
+        self.server = None
+    def __enter__(self):
+        libprint.print_func_info(logger = log.debug)
+        try:
+            output = None
+            if all(isinstance(p, list) for p in self.ports):
+                output = lib.start_multiple(self.ports, **self.kwargs)
             else:
-                instance = start(*ports, server = server, **args_dict)
-                if isinstance(instances, tuple):
-                    server = instances[1]
-                    instances = instances[0]
-                instance.join()
-        server = None
-        if args.start:
-            start_from_args(args.start, args.server, **args_dict)
-        elif args.start_from_file:
+                output = lib.start(*self.ports, **self.kwargs)
+            self.instances = output.get("instances", None)
+            self.server = output.get("server", None)
+            return PyTorPrivoxyContext.Ctx(output, self)
+        finally:
+            libprint.print_func_info(logger = log.debug)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        libprint.print_func_info(logger = log.debug)
+        if exc_type:
+            libprint.print_func_info(logger = log.debug)
+            lib.stop(self.instances)
+            try:
+                lib.join(self.instances)
+            finally:
+                self.stop_server()
+            log_string = f"{exc_type} {exc_val} {exc_tb}"
+            libprint.print_func_info(logger = log.error, extra_string = log_string)
+            libprint.print_func_info(logger = log.debug)
+            raise exc_val
+        lib.stop(self.instances)
+        try:
+            lib.join(self.instances)
+        finally:
+            libprint.print_func_info(logger = log.debug)
+            self.stop_server()
+        libprint.print_func_info(logger = log.debug)
+    def stop_server(self):
+        libprint.print_func_info(logger = log.debug)
+        if self.server:
+            self.server.stop()
+
+class PyTorPrivoxyAppContext:
+    def __init__(self, **kwargs):
+        self.log_level = libkw.handle_kwargs("log_level", default_output = "DEBUG", **kwargs)
+        self.stdout = libkw.handle_kwargs("stdout", default_output = False, **kwargs)
+        self.password_from_file = libkw.handle_kwargs("password_from_file", default_output = None, **kwargs)
+        self.start = libkw.handle_kwargs("start", default_output = None, **kwargs)
+        self.start_from_file = libkw.handle_kwargs("start_from_file", default_output = None, **kwargs)
+        self.server_port = libkw.handle_kwargs("server_port", default_output = None, **kwargs)
+        self.timeout = libkw.handle_kwargs("timeout", default_output = 300, **kwargs)
+        self.success_factor = libkw.handle_kwargs("success_factor", default_output = 1., **kwargs)
+        self.wait_for_initialization = libkw.handle_kwargs("wait_for_initialization", default_output = False, **kwargs)
+        self.tor_privoxy_ctx = None
+    def __enter__(self):
+        libprint.print_func_info(logger = log.info)
+        if self.log_level:
+            lib.set_logging_level(self.log_level)
+        if self.stdout:
+            lib.enable_stdout()
+        args_dict = {}
+        args_dict["timeout"] = self.timeout
+        args_dict["success_factor"] = self.success_factor
+        args_dict["wait_for_initialization"] = self.wait_for_initialization
+        if self.password_from_file:
+            from private import libpass
+            libpass.load_password_from_file(self.password_from_file)
+        _ports = None
+        if self.start:
+            _ports = self.start
+        elif self.start_from_file:
             ports_all = []
-            with open(args.start_from_file, "r") as f:
+            with open(self.start_from_file, "r") as f:
                 lines = f.readlines()
             for line in lines:
                 ports = line.split()
@@ -115,6 +107,63 @@ if __name__ == "__main__":
                 except ValueError:
                     raise Exception(f"Element of {ports} cannot be converted into int")
                 ports_all.append(list(ports))
-            start_from_args(ports_all, args.server, **args_dict)
-    except TimeoutError as te:
-        log.error(f"Timeout expired: {te}")
+            _ports = ports_all
+        self.tor_privoxy_ctx = PyTorPrivoxyContext(_ports, server_port = self.server_port, **args_dict)
+        libprint.print_func_info(logger = log.info)
+        return self.tor_privoxy_ctx.__enter__()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.tor_privoxy_ctx.__exit__(exc_type, exc_val, exc_tb)
+
+def main(callback = lambda ctx: None):
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--start", help = "start tor privoxy: socks_port, control_port, listen_port", type=int, nargs=3, action="append")
+    parser.add_argument("--start_from_file", help = "like start but read ports from file", type=str)
+    parser.add_argument("--log_level", help = "logging debug: CRITICAL ERROR WARNING INFO DEBUG", type=str, default = "INFO")
+    parser.add_argument("--stdout", help = "logging into stdout", action='store_true')
+    parser.add_argument("--timeout", help = "timeout for initialization, in the seconds. Default: 300s", type=int, default=300)
+    parser.add_argument("--password_from_file", help = "Load password from file", type=str, default=None)
+    parser.add_argument("--server", help = "Establish server to multiprocess communication. As argument it takes listen port", type=int, default=None)
+    factor_description = """
+    Factor of success of initialization after what the app will be continued, otherwise it will interrupted.
+    When is only one --start then it is ignored.
+    """
+    parser.add_argument("--success_factor", help = factor_description, type=float, default=1)
+    args = parser.parse_args()
+    with PyTorPrivoxyAppContext(**vars(args)) as ctx:
+        callback(ctx)
+
+def start_main_async(callback = None, **kwargs):
+    arg_log_level = libkw.handle_kwargs("log_level", default_output = "DEBUG", **kwargs)
+    if arg_log_level:
+        lib.set_logging_level(arg_log_level)
+    def target(stop_control, **_kwargs):
+        libprint.print_func_info(logger = log.info, extra_string = f"kwargs {_kwargs}")
+        with PyTorPrivoxyAppContext(**_kwargs) as ctx:
+            callback(ctx, stop_control)
+    thread = libthread.Thread(target = target, kwargs = kwargs)
+    thread.start()
+    return thread
+
+import sys
+import threading
+
+event = threading.Event()
+
+def sigint_handler(signal, frame):
+    event.set()
+
+def sigint_callback(ctx):
+    event.wait()
+    ctx.stop_all()
+
+if __name__ == "__main__":
+    try:
+        signal(SIGINT, sigint_handler)
+        main(callback = sigint_callback)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        libprint.print_func_info(extra_string = f"{e} {tb}", logger = log.error)
+        import sys
+        sys.exit(1)
