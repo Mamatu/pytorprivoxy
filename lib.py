@@ -13,8 +13,8 @@ def start(socks_port : int, control_port : int, listen_port : int, **kwargs):
     return start_multiple([(socks_port, control_port, listen_port)], **kwargs)
 
 def start_multiple(ports : list, **kwargs):
-    callback_before_wait = libkw.handle_kwargs("callback_before_wait", default_output = None)
-    wait_for_initialization = libkw.handle_kwargs("wait_for_initialization", default_output = False)
+    callback_before_wait = libkw.handle_kwargs("callback_before_wait", default_output = None, **kwargs)
+    wait_for_initialization = libkw.handle_kwargs("wait_for_initialization", default_output = False, **kwargs)
     libprint.print_func_info(prefix = "+", logger = log.debug)
     def invalid_ports(ports):
         raise Exception(f"Ports must be list of int tuple or int list (of 3 size): it is: {ports}")
