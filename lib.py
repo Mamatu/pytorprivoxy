@@ -39,7 +39,7 @@ def start_multiple(ports : list, **kwargs):
         futures.append(future)
     if callback_before_wait:
         for i in instances: callback_before_wait(i)
-    libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"instances = {instances}")
+    libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"instances = {instances} wait_for_initialization = {wait_for_initialization}")
     if wait_for_initialization:
         libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"futures = {futures}")
         results = [f.result() for f in futures]
