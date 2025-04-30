@@ -108,7 +108,8 @@ def _get_ip_address(data, port):
     try:
         data = json.loads(data)
         import ipaddress
-        return ipaddress.ip_address(data[str(port)]), data["is_tor"]
+        data = data[str(port)]
+        return ipaddress.ip_address(data["address"]), data["is_tor"]
     except Exception as e:
         raise Exception(f"Error in _get_ip_address: {e} data: {data} port: {port}")
 
