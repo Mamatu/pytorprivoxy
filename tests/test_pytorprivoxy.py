@@ -7,6 +7,8 @@ from private.lib import is_port_open
 import logging
 log = logging.getLogger('pytorprivoxy')
 
+import json
+
 import os
 TEST_LOG_LEVEL = os.environ.get("TEST_LOG_LEVEL")
 if TEST_LOG_LEVEL is None:
@@ -73,7 +75,7 @@ def test_interrupt_initialization():
         stop_control.stop()
     thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = (9000, 9001, 9002), stdout = True)
     libprint.print_func_info(logger = log.info)
-    thread.join()
+    thread.join(raise_exception = True)
     end_time = time.time()
     assert (end_time - start_time) <= 20
 
@@ -98,18 +100,17 @@ def test_initialize():
         ctx.stop_all()
         stop_control.stop()
     thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = ports, server_port = 9003, stdout = True)
-    thread.join()
+    thread.join(raise_exception = True)
     end_time = time.time()
     assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT
 
-def _get_ip_address(data):
+def _get_ip_address(data, port):
     try:
-        import json
         data = json.loads(data)
         import ipaddress
-        return ipaddress.ip_address(data['origin'])
+        return ipaddress.ip_address(data[str(port)]), data["is_tor"]
     except Exception as e:
-        return None
+        raise Exception(f"Error in _get_ip_address: {e} data: {data} port: {port}")
 
 def test_checkip():
     libprint.set_global_string("test_checkip")
@@ -134,13 +135,14 @@ def test_checkip():
             import json
             client.send("checkip 9002")
             data = client.recv()
-            ipaddress = _get_ip_address(data)
+            ipaddress, is_tor = _get_ip_address(data, 9002)
+            assert is_tor == True
             assert ipaddress != None
             client.send("stop")
         ctx.stop_all()
         stop_control.stop()
     thread = main.start_main_async(callback, log_level = TEST_LOG_LEVEL, start = ports, server_port = server_port, stdout = True)
-    thread.join()
+    thread.join(raise_exception = True)
     end_time = time.time()
     assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT
 
@@ -151,12 +153,14 @@ class IPAddressIdenticalException(Exception):
 def newnym_process(client):
     client.send("checkip 9002")
     data = client.recv()
-    ipaddress1 = _get_ip_address(data)
+    ipaddress1, is_tor_1 = _get_ip_address(data, 9002)
     client.send("newnym 9001")
     data = client.recv()
     client.send("checkip 9002")
     data = client.recv()
-    ipaddress2 = _get_ip_address(data)
+    ipaddress2, is_tor_2 = _get_ip_address(data, 9002)
+    assert is_tor_1 == True
+    assert is_tor_2 == True
     if ipaddress1 == ipaddress2:
         raise IPAddressIdenticalException(ipaddress1, ipaddress2)
     return ipaddress1, ipaddress2
@@ -196,7 +200,7 @@ def test_newnym():
         ctx.stop_all()
         stop_control.stop()
     thread = main.start_main_async(callback, **main_async_kwargs)
-    thread.join()
+    thread.join(raise_exception = True)
     end_time = time.time()
     assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT
     libprint.print_func_info(logger = log.info, prefix = "-")
@@ -240,6 +244,6 @@ def test_newnym_2_instances():
         ctx.stop_all()
         stop_control.stop()
     thread = main.start_main_async(callback, **main_async_kwargs)
-    thread.join()
+    thread.join(raise_exception = True)
     end_time = time.time()
     assert (end_time - start_time) <= TEST_INITIALIZATION_TIMEOUT

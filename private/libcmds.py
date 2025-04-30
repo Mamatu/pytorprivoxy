@@ -5,6 +5,7 @@ log = logging.getLogger('pytorprivoxy')
 
 import time
 import json
+import re
 
 def handle_line(line, instances):
     libprint.print_func_info(prefix = "+", logger = log.debug, extra_string = f"line: {line}")
@@ -64,9 +65,9 @@ def _get_commands(instances):
             return
         privoxy_ports = [convert(a) for a in args]
         instances = get_instances(privoxy_ports, instances, lambda x: x.privoxy_process.listen_port)
-        output = None
+        outputs = {}
         for instance in instances:
-            command = f"curl -x \"http://localhost:{instance.privoxy_process.listen_port}\" http://httpbin.org/ip"
+            command = f"curl -f -x \"http://localhost:{instance.privoxy_process.listen_port}\" https://check.torproject.org/"
             process = libprocess.Process(command, use_temp_file = True, shell = True)
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"Run command {command}")
             process.start()
@@ -74,13 +75,29 @@ def _get_commands(instances):
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"After command {command}")
             if process.is_stdout():
                 stdout = process.get_stdout()
-                if output is None:
-                    output = ""
-                output = output + "\n".join(stdout.readlines())
+                readlines = stdout.readlines()
+                body = "\n".join(readlines)
+                match = re.search(r"Your IP address appears to be:  <strong>([0-9]*.[0-9]*.[0-9]*.[0-9]*)</strong>", body)
+                ip = match.group(1)
+                match_is_tor = re.search(r"Congratulations. This browser is configured to use Tor.", body)
+                is_tor = False
+                is_not_tor = True
+                if match_is_tor is not None:
+                    is_tor = True
+                match_is_not_tor = re.search(r"Sorry. You are not using Tor", body)
+                if match_is_not_tor is None:
+                    is_not_tor = False
+                if is_tor and not is_not_tor:
+                    outputs["is_tor"] = True
+                elif not is_tor and is_not_tor:
+                    outputs["is_tor"] = False
+                else:
+                    raise Exception(f"checkip: unexpected result of is_tor and is_not_tor {is_tor} {is_not_tor} {match_is_tor} {match_is_not_tor}")
+                outputs[instance.privoxy_process.listen_port] = ip
             else:
                 extra_string = "checkip: no stdout"
                 libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
-        return output
+        return json.dumps(outputs)
     _commands["checkip"] = _checkip
     def _restart(instances, args):
         libprint.print_func_info(logger = log.debug)
