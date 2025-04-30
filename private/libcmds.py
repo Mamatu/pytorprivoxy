@@ -87,13 +87,14 @@ def _get_commands(instances):
                 match_is_not_tor = re.search(r"Sorry. You are not using Tor", body)
                 if match_is_not_tor is None:
                     is_not_tor = False
+                IS_TOR = False
                 if is_tor and not is_not_tor:
-                    outputs["is_tor"] = True
+                    IS_TOR = True
                 elif not is_tor and is_not_tor:
-                    outputs["is_tor"] = False
+                    IS_TOR = False
                 else:
                     raise Exception(f"checkip: unexpected result of is_tor and is_not_tor {is_tor} {is_not_tor} {match_is_tor} {match_is_not_tor}")
-                outputs[instance.privoxy_process.listen_port] = ip
+                outputs[instance.privoxy_process.listen_port] = {"address" : ip, "is_tor" : IS_TOR}
             else:
                 extra_string = "checkip: no stdout"
                 libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
