@@ -98,6 +98,7 @@ def _get_commands(instances):
             else:
                 extra_string = "checkip: no stdout"
                 libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
+        libprint.print_func_info(logger = log.debug, extra_string = f"checkip: outputs {outputs}")
         return json.dumps(outputs)
     _commands["checkip"] = _checkip
     def _restart(instances, args):
