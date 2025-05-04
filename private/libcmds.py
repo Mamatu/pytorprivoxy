@@ -72,6 +72,9 @@ def _get_commands(instances):
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"Run command {command}")
             process.start()
             return_code = 0
+            if return_code is not 0:
+                outputs[instance.privoxy_process.listen_port] = {"address" : None, "is_tor" : None, "return_code" : return_code}
+                continue
             def callback_on_error_func(error, stdout, stderr):
                 libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"checkip: error {error} stdout {stdout} stderr {stderr}")
                 return error
