@@ -71,7 +71,13 @@ def _get_commands(instances):
             process = libprocess.Process(command, use_temp_file = True, shell = True)
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"Run command {command}")
             process.start()
-            process.wait(exception_on_error = True, print_stdout = True, print_stderr = True)
+            return_code = 0
+            def callback_on_error_func(error, stdout, stderr):
+                libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"checkip: error {error} stdout {stdout} stderr {stderr}")
+                return error
+            return_code = process.wait(callback_on_error = callback_on_error_func, print_stdout = True, print_stderr = True)
+            if return_code is None:
+                return_code = 0
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"After command {command}")
             if process.is_stdout():
                 stdout = process.get_stdout()
@@ -93,8 +99,9 @@ def _get_commands(instances):
                 elif not is_tor and is_not_tor:
                     IS_TOR = False
                 else:
-                    raise Exception(f"checkip: unexpected result of is_tor and is_not_tor {is_tor} {is_not_tor} {match_is_tor} {match_is_not_tor}")
-                outputs[instance.privoxy_process.listen_port] = {"address" : ip, "is_tor" : IS_TOR}
+                    IS_TOR = None
+                    libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"checkip: unexpected result of is_tor and is_not_tor {is_tor} {is_not_tor} {match_is_tor} {match_is_not_tor}")
+                outputs[instance.privoxy_process.listen_port] = {"address" : ip, "is_tor" : IS_TOR, "return_code" : return_code}
             else:
                 extra_string = "checkip: no stdout"
                 libprint.print_func_info(prefix = "*", logger = log.error, extra_string = extra_string)
