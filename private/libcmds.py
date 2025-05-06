@@ -71,16 +71,15 @@ def _get_commands(instances):
             process = libprocess.Process(command, use_temp_file = True, shell = True)
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"Run command {command}")
             process.start()
-            return_code = 0
-            if return_code is not 0:
-                outputs[instance.privoxy_process.listen_port] = {"address" : None, "is_tor" : None, "return_code" : return_code}
-                continue
             def callback_on_error_func(error, stdout, stderr):
                 libprint.print_func_info(prefix = "*", logger = log.error, extra_string = f"checkip: error {error} stdout {stdout} stderr {stderr}")
                 return error
             return_code = process.wait(callback_on_error = callback_on_error_func, print_stdout = True, print_stderr = True)
             if return_code is None:
                 return_code = 0
+            if return_code != 0:
+                outputs[instance.privoxy_process.listen_port] = {"address" : None, "is_tor" : None, "return_code" : return_code}
+                continue
             libprint.print_func_info(prefix = "*", logger = log.debug, extra_string = f"After command {command}")
             if process.is_stdout():
                 stdout = process.get_stdout()
